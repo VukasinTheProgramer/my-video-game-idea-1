@@ -18,14 +18,25 @@ public static class EquipmentLayerOrder
     public const int DirectionAwareFront = 12;
     public const int DirectionAwareBehind = 1;
 
+    // Stat-only slots (Belt/Ring1/Ring2/Trinket1/Trinket2) never render anything -
+    // PickSprite returns null for them since they carry no LPC frames - so the
+    // exact sorting order doesn't matter. They still need a Fixed entry or
+    // Equipment.ApplyFrame throws a KeyNotFoundException the moment one is equipped.
+    public const int StatOnlyOrder = 9;
+
     public static readonly IReadOnlyDictionary<EquipmentSlot, int> Fixed = new Dictionary<EquipmentSlot, int>
     {
         { EquipmentSlot.Feet, 3 },
         { EquipmentSlot.Legs, 4 },
-        { EquipmentSlot.Torso, 5 },
-        { EquipmentSlot.Arms, 6 },
+        { EquipmentSlot.Chest, 5 },
+        { EquipmentSlot.Hands, 6 },
         { EquipmentSlot.Shoulders, 7 },
         { EquipmentSlot.Neck, 8 },
         { EquipmentSlot.Head, 11 },
+        { EquipmentSlot.Belt, StatOnlyOrder },
+        { EquipmentSlot.Ring1, StatOnlyOrder },
+        { EquipmentSlot.Ring2, StatOnlyOrder },
+        { EquipmentSlot.Trinket1, StatOnlyOrder },
+        { EquipmentSlot.Trinket2, StatOnlyOrder },
     };
 }

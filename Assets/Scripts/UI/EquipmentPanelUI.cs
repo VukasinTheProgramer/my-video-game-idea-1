@@ -4,15 +4,18 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Shows the player's 10 equipment slots and unlimited bag as ItemSlotUI
-/// squares (icon + rarity-colored outline, COMBAT_DESIGN.md §6). Clicking
-/// an equipped slot unequips it to the bag; clicking a bag slot equips it
-/// (swapping whatever was equipped back into the bag automatically).
+/// Shows the player's 15 equipment slots and unlimited bag as ItemSlotUI
+/// squares (icon + rarity-colored outline). Clicking an equipped slot
+/// unequips it to the bag; clicking a bag slot equips it (swapping whatever
+/// was equipped back into the bag automatically).
 ///
-/// slotUIs must be sized 10 and ordered to match SlotOrder (Head, Neck,
-/// MainHand, OffHand, Shoulders, Torso, Arms, Back, Legs, Feet). Bag slots
-/// are spawned/pooled at runtime under bagSlotContainer - no bag prefab
-/// needed, just an empty RectTransform with a layout group on it.
+/// slotUIs must be sized 15 and ordered to match SlotOrder (Head, Neck,
+/// MainHand, OffHand, Shoulders, Chest, Hands, Back, Legs, Feet, Belt,
+/// Ring1, Ring2, Trinket1, Trinket2 - the last 5 are stat-only, no LPC art,
+/// so their slot icons never show a character-layer preview, just whatever
+/// item icon is bound). Bag slots are spawned/pooled at runtime under
+/// bagSlotContainer - no bag prefab needed, just an empty RectTransform
+/// with a layout group on it.
 /// </summary>
 public class EquipmentPanelUI : MonoBehaviour
 {
@@ -46,8 +49,10 @@ public class EquipmentPanelUI : MonoBehaviour
     private static readonly EquipmentSlot[] SlotOrder =
     {
         EquipmentSlot.Head, EquipmentSlot.Neck, EquipmentSlot.MainHand, EquipmentSlot.OffHand,
-        EquipmentSlot.Shoulders, EquipmentSlot.Torso, EquipmentSlot.Arms, EquipmentSlot.Back,
-        EquipmentSlot.Legs, EquipmentSlot.Feet
+        EquipmentSlot.Shoulders, EquipmentSlot.Chest, EquipmentSlot.Hands, EquipmentSlot.Back,
+        EquipmentSlot.Legs, EquipmentSlot.Feet,
+        EquipmentSlot.Belt, EquipmentSlot.Ring1, EquipmentSlot.Ring2,
+        EquipmentSlot.Trinket1, EquipmentSlot.Trinket2
     };
 
     private void Awake()
