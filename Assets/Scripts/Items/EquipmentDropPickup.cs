@@ -2,9 +2,10 @@ using UnityEngine;
 
 /// <summary>
 /// A dropped piece of equipment sitting on the floor (enemy loot, see
-/// COMBAT_DESIGN.md §2 "Drops"). Picking it up adds it to the picker's bag
-/// (Inventory) rather than auto-equipping - the player chooses when to
-/// equip it. Unlimited bag capacity, no "drop" action to lose it again.
+/// IMPLEMENTED.md -> "Bag / Inventory"). Picking it up adds it to the
+/// picker's bag (Inventory) rather than auto-equipping - the player chooses
+/// when to equip it. Unlimited bag capacity, no "drop" action to lose it
+/// again.
 /// </summary>
 public class EquipmentDropPickup : ItemPickup
 {
@@ -20,7 +21,7 @@ public class EquipmentDropPickup : ItemPickup
 
         // Without a renderer the drop is invisible and the player can only find it
         // by walking over every corpse tile. Uses the same frame ItemSlotUI uses as
-        // an icon, tinted by rarity (COMBAT_DESIGN.md §6 drop colors).
+        // an icon, tinted by rarity (IMPLEMENTED.md -> "Equipment", rarity colors).
         var renderer = go.AddComponent<SpriteRenderer>();
         renderer.sprite = item.walkDown != null && item.walkDown.Length > 0 ? item.walkDown[0] : null;
         renderer.color = RarityVisuals.OutlineColor(item.rarity);

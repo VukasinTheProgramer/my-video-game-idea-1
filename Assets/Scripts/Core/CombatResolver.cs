@@ -2,8 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Outcome of a single Entity.Attack call. Entity.Attack applies Damage/
-/// LifeStolen; UI (COMBAT_DESIGN.md §6 damage numbers, not implemented yet)
-/// will read WasCrit/WasDodged/WasParried to color/label the popup.
+/// LifeStolen; UI (IMPLEMENTED.md -> "Combat feedback", damage numbers)
+/// reads WasCrit/WasDodged/WasParried to color/label the popup.
 /// </summary>
 public readonly struct CombatResult
 {
@@ -24,7 +24,7 @@ public readonly struct CombatResult
 }
 
 /// <summary>
-/// Resolves one attack per COMBAT_DESIGN.md §1: picks the scaling stat
+/// Resolves one attack per IMPLEMENTED.md -> "Stat system": picks the scaling stat
 /// (ATK/AGI/MAG) and defense stat (DEF/MDEF) from the attacker's weapon
 /// type, rolls Dodge -> Parry -> Crit in that order, then applies whichever
 /// damage formula won. Stateless/static — it only reads the two Entities
@@ -68,18 +68,18 @@ public static class CombatResolver
 
     // --- Formulas below are exposed publicly so stat-display UI shows the exact
     // numbers combat actually rolls against, instead of a second copy that can
-    // drift out of sync (COMBAT_DESIGN.md §1). ---
+    // drift out of sync (IMPLEMENTED.md -> "Stat system"). ---
 
     /// <summary>
-    /// Melee-capable weapons may Parry (§1). Unarmed (None) may NOT: the doc ties
-    /// Parry to having a melee weapon out to block with, so an empty MainHand rolls
+    /// Melee-capable weapons may Parry. Unarmed (None) may NOT: Parry is tied
+    /// to having a melee weapon out to block with, so an empty MainHand rolls
     /// 0% rather than inheriting the "unarmed defaults to ATK/DEF" rule that
     /// ScalingStatFor/DefenseStatFor use for damage.
     /// </summary>
     public static bool CanParry(WeaponType weapon) =>
         weapon != WeaponType.None && weapon != WeaponType.Bow && weapon != WeaponType.Staff;
 
-    /// <summary>Life steal rate after the documented 50% cap (§1 modifier table).</summary>
+    /// <summary>Life steal rate after the documented 50% cap (IMPLEMENTED.md -> "Stat system").</summary>
     public static float EffectiveLifeStealPercent(Stats attacker) => Mathf.Min(50f, attacker.lifeSteal);
 
     public static float EffectiveDodgeChance(Stats defender) =>

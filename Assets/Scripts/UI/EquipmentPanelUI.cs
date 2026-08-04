@@ -23,10 +23,10 @@ public class EquipmentPanelUI : MonoBehaviour
     [SerializeField] private ItemSlotUI[] slotUIs;
     [SerializeField] private Text[] slotLabels;
 
-    [Header("Stats readout - single multi-line block, COMBAT_DESIGN.md §1")]
+    [Header("Stats readout - single multi-line block, IMPLEMENTED.md -> \"Stat system\"")]
     [SerializeField] private Text statsText;
 
-    [Header("Leveling - COMBAT_DESIGN.md §1a. + buttons only spend points on Attack/Health/Agility (Magic/DEF/MDEF stay gear-only); no respec.")]
+    [Header("Leveling - IMPLEMENTED.md -> \"Leveling & stat points\". + buttons only spend points on Attack/Health/Agility (Magic/DEF/MDEF stay gear-only); no respec.")]
     [SerializeField] private Text progressionText;
     [SerializeField] private Text availablePointsText;
     [SerializeField] private Button attackPointButton;
@@ -289,8 +289,8 @@ public class EquipmentPanelUI : MonoBehaviour
     }
 
     /// <summary>Level/XP readout plus the Attack/Health/Agility point-spend buttons
-    /// (COMBAT_DESIGN.md §1a) - buttons only enable while points are available;
-    /// spending is permanent, there's no respec.</summary>
+    /// (IMPLEMENTED.md -> "Leveling & stat points") - buttons only enable while
+    /// points are available; spending is permanent, there's no respec.</summary>
     private void RefreshProgression(PlayerController player)
     {
         PlayerProgression progression = player.GetComponent<PlayerProgression>();

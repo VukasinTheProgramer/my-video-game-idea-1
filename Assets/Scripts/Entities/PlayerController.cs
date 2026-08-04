@@ -67,7 +67,7 @@ public class PlayerController : Entity
         TurnManager.Instance.EndPlayerTurn();
     }
 
-    /// <summary>Opens the battle screen if any registered enemy is within BattleManager.EngageRange (COMBAT_DESIGN.md §0).</summary>
+    /// <summary>Opens the battle screen if any registered enemy is within BattleManager.EngageRange (IMPLEMENTED.md -> "Battle screen (encounter flow)").</summary>
     private bool TryEngageNearbyEnemy()
     {
         if (BattleManager.Instance == null || TurnManager.Instance == null) return false;

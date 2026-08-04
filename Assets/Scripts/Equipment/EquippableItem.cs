@@ -12,14 +12,14 @@ public class EquippableItem : ScriptableObject
     public EquipmentSlot slot;
     public string displayName;
 
-    [Header("Stats (COMBAT_DESIGN.md §1, §2)")]
+    [Header("Stats (IMPLEMENTED.md -> \"Stat system\", \"Equipment\")")]
     public Stats bonusStats = new Stats();
     [Tooltip("MainHand only - feeds CombatResolver's rawDamage. Ignored for other slots.")]
     public int weaponDamage;
     public Rarity rarity = Rarity.Common;
-    [Tooltip("Hand-authored for now (v1 scope) - used for bag sorting and display. The full §2c floor-scaling system would set this per-drop instead of per-template.")]
+    [Tooltip("Hand-authored for now (v1 scope) - used for bag sorting and display. The full floor-scaling system (ROADMAP.md -> \"Item generation: floor & rarity stat scaling\") would set this per-drop instead of per-template.")]
     public int itemLevel = 1;
-    [Tooltip("MainHand only - drives CombatResolver's scaling/defense stat pick (§1) and, later, attack pattern (§4). Leave None for non-weapon slots.")]
+    [Tooltip("MainHand only - drives CombatResolver's scaling/defense stat pick (IMPLEMENTED.md -> \"Stat system\") and, later, attack pattern (ROADMAP.md -> \"Weapon-driven attack patterns\"). Leave None for non-weapon slots.")]
     public WeaponType weaponType = WeaponType.None;
 
     [Header("Walk (9 frames each)")]

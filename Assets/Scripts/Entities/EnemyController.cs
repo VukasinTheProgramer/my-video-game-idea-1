@@ -10,11 +10,12 @@ using UnityEngine;
 public class EnemyController : Entity
 {
     [SerializeField] private LootTable lootTable;
-    [Tooltip("Flat XP granted to the player on a kill (COMBAT_DESIGN.md §1a) - tune per enemy type/floor tier directly, no formula.")]
+    [Tooltip("Flat XP granted to the player on a kill (IMPLEMENTED.md -> \"Leveling & stat points\") - tune per enemy type/floor tier directly, no formula.")]
     [SerializeField] private int xpReward = 10;
 
     /// <summary>Fires once, right after a loot drop is spawned on death - GameManager
-    /// subscribes to track it for floor-cleanup (COMBAT_DESIGN.md §2 "Drops").</summary>
+    /// subscribes to track it for floor-cleanup. Only fires once a LootTable
+    /// asset exists to roll against - see IN_PROGRESS.md -> "1b. Enemy loot".</summary>
     public event Action<ItemPickup> OnLootDropped;
 
     private PlayerController player;
@@ -65,7 +66,7 @@ public class EnemyController : Entity
         }
     }
 
-    /// <summary>Opens the battle screen if the player's within range (COMBAT_DESIGN.md §0),
+    /// <summary>Opens the battle screen if the player's within range (IMPLEMENTED.md -> "Battle screen (encounter flow)"),
     /// or falls back to the old direct adjacent-attack if no BattleManager is wired up yet.</summary>
     private bool TryEngageOrFallbackAttack()
     {

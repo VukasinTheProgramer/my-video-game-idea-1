@@ -92,7 +92,7 @@ public class BattleManager : MonoBehaviour
         // Power+Agility for how *often* you act; we're a simple 1v1 back-and-forth
         // rather than a continuous tick engine, so this is the faithful
         // simplification: whoever's faster acts first, then it alternates as
-        // normal - see COMBAT_DESIGN.md §0).
+        // normal - see IMPLEMENTED.md -> "Battle screen (encounter flow)").
         bool playerActsFirst = player.Stats.agility >= enemy.Stats.agility;
         screenUI?.SetTurn(playerActsFirst);
 

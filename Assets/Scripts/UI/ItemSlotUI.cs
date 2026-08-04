@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// One item square: icon with a rarity-colored outline frame around it
-/// (COMBAT_DESIGN.md §6). Runic gets an animated outline instead of a
+/// (IMPLEMENTED.md -> "Equipment", rarity colors). Runic gets an animated outline instead of a
 /// static one - implemented as a color pulse (rarity color <-> black)
 /// rather than a literal "marching ants" border, since that's reliable
 /// with plain UI Images and needs no custom shader (same reasoning as the

@@ -2,7 +2,7 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// Screen shake on crits (COMBAT_DESIGN.md §6). Self-bootstrapping singleton
+/// Screen shake on crits (IMPLEMENTED.md -> "Combat feedback"). Self-bootstrapping singleton
 /// like DamageNumberSpawner, except CurrentOffset is a passive static read that
 /// does NOT force-create the instance - only Shake() does - so a game where
 /// nothing ever crits never spawns the object.

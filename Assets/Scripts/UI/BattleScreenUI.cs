@@ -6,8 +6,8 @@ using UnityEngine.UI;
 /// <summary>
 /// Full-screen battle overlay: covers the dungeon view and shows just the
 /// player and the one enemy they engaged, with HP bars and an Attack
-/// button/keypress (COMBAT_DESIGN.md - Bit Heroes-style battle screen,
-/// driven by BattleManager).
+/// button/keypress (IMPLEMENTED.md -> "Battle screen (encounter flow)" -
+/// Bit Heroes-style battle screen, driven by BattleManager).
 ///
 /// v1 simplification: portraits are a snapshot of each Entity's current
 /// SpriteRenderer.sprite, not dedicated battle art/animation - there's no
@@ -23,7 +23,7 @@ public class BattleScreenUI : MonoBehaviour
     [SerializeField] private Slider playerHealthBar;
     [SerializeField] private Slider enemyHealthBar;
     [SerializeField] private Text enemyNameText;
-    [Tooltip("Top-of-screen \"Your Turn\" / \"Enemy Turn\" label. Place this above the portraits in the Canvas; the attack/ability button(s) below stay at the bottom (COMBAT_DESIGN.md §0 layout).")]
+    [Tooltip("Top-of-screen \"Your Turn\" / \"Enemy Turn\" label. Place this above the portraits in the Canvas; the attack/ability button(s) below stay at the bottom (IMPLEMENTED.md -> \"Battle screen (encounter flow)\" layout).")]
     [SerializeField] private Text turnIndicatorText;
     [SerializeField] private Button attackButton;
 

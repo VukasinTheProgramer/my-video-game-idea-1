@@ -1,9 +1,10 @@
 using System;
 
 /// <summary>
-/// Full combat stat block for an Entity. See COMBAT_DESIGN.md §1/§1a for the
-/// design rationale and the formulas that consume these values
-/// (CombatResolver resolves one attack from a pair of Stats).
+/// Full combat stat block for an Entity. See IMPLEMENTED.md -> "Stat system"
+/// and "Leveling & stat points" for the design rationale and the formulas
+/// that consume these values (CombatResolver resolves one attack from a
+/// pair of Stats).
 ///
 /// Percent-based fields (critChanceBonus, critDamageBonus, dodgeBonus,
 /// parryBonus, lifeSteal) are stored as percentage points (5f == 5%), not
@@ -29,7 +30,7 @@ public class Stats
     public float parryBonus;
     public float lifeSteal;
 
-    /// <summary>Level 1 starting baseline before any gear — COMBAT_DESIGN.md §1a.</summary>
+    /// <summary>Level 1 starting baseline before any gear — IMPLEMENTED.md -> "Stat system".</summary>
     public static Stats Level1Default()
     {
         return new Stats

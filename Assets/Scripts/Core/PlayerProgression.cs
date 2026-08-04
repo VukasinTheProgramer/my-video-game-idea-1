@@ -2,23 +2,24 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// Player XP, leveling, and stat-point spending (COMBAT_DESIGN.md §1a).
+/// Player XP, leveling, and stat-point spending
+/// (IMPLEMENTED.md -> "Leveling & stat points").
 /// Attach to the same GameObject as PlayerController/Entity.
 ///
 /// Points are permanent once spent (no respec, matching Bit Heroes) - so
 /// unlike gear this never needs to be "un-applied," it just keeps adding to
-/// Entity.baseStats via the existing ApplyStatBonus(Stats) hook (§2's
-/// floor-scaling buffs use the same method, so this needed zero Entity
-/// changes).
+/// Entity.baseStats via the existing ApplyStatBonus(Stats) hook (the same
+/// method GameManager's per-floor enemy scaling uses, so this needed zero
+/// Entity changes).
 /// </summary>
 [RequireComponent(typeof(Entity))]
 public class PlayerProgression : MonoBehaviour
 {
-    /// <summary>The three stats a player can spend points on (§1a) - Magic/DEF/MDEF
+    /// <summary>The three stats a player can spend points on - Magic/DEF/MDEF
     /// stay gear-only, same as the original 10-starting-point design.</summary>
     public enum AllocatableStat { Attack, Health, Agility }
 
-    [Header("Starting pool - COMBAT_DESIGN.md §1a's original 10 free points, now spent through this same system")]
+    [Header("Starting pool - IMPLEMENTED.md -> \"Leveling & stat points\"'s original 10 free points, now spent through this same system")]
     [SerializeField] private int startingStatPoints = 10;
 
     [Header("Stat points granted each time you level up")]

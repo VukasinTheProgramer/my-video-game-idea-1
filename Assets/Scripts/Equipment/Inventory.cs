@@ -34,7 +34,7 @@ public class Inventory : MonoBehaviour
         return removed;
     }
 
-    /// <summary>Sorts by rarity (COMBAT_DESIGN.md rarity ladder), highest first; item level breaks ties.</summary>
+    /// <summary>Sorts by rarity (IMPLEMENTED.md -> "Equipment" rarity ladder), highest first; item level breaks ties.</summary>
     public void SortByRarity()
     {
         items.Sort((a, b) =>

@@ -33,7 +33,7 @@ public abstract class ItemPickup : MonoBehaviour
     /// Called when an entity walks onto this item's cell. Returns true if the item
     /// was actually consumed - the caller destroys it only then, so a pickup that
     /// declines (no bag to put it in, already at full HP) stays on the floor
-    /// instead of being silently destroyed (COMBAT_DESIGN.md §2½).
+    /// instead of being silently destroyed (IMPLEMENTED.md -> "Bag / Inventory").
     /// </summary>
     public abstract bool PickUp(Entity picker);
 

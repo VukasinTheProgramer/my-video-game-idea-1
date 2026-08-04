@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Rarity outline colors for item-slot UI (COMBAT_DESIGN.md §6): Common
+/// Rarity outline colors for item-slot UI (IMPLEMENTED.md -> "Equipment"): Common
 /// green, Rare blue, Epic purple, Legendary yellow, Set cyan, Mythic red,
 /// Runic red pulsing to black ("motion outline" - the only rarity that
 /// animates, everything else is a static colored frame).

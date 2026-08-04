@@ -59,7 +59,7 @@ public class Equipment : MonoBehaviour
         // because LootTable hands out the shared ScriptableObject template, so the
         // bag can legitimately hold a second reference to the same asset - falling
         // through would Remove that copy without Adding anything back, destroying
-        // it (COMBAT_DESIGN.md §2½: an item is never lost).
+        // it (IMPLEMENTED.md -> "Bag / Inventory": an item is never lost).
         if (previous == item) return;
 
         if (previous != null) inventory?.Add(previous);
@@ -107,7 +107,7 @@ public class Equipment : MonoBehaviour
         ApplyFrame(lastDirection, lastAction, lastFrameIndex);
     }
 
-    /// <summary>Sum of bonusStats across every equipped item (COMBAT_DESIGN.md §2). Entity.Stats adds this to baseStats.</summary>
+    /// <summary>Sum of bonusStats across every equipped item (IMPLEMENTED.md -> "Equipment"). Entity.Stats adds this to baseStats.</summary>
     public Stats TotalBonusStats
     {
         get

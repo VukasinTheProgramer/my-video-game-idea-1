@@ -279,7 +279,7 @@ public class GameManager : MonoBehaviour
     /// down. The last enemy's drop is spawned microseconds before this advance, so
     /// DespawnPreviousFloor would otherwise destroy it in the same frame it
     /// appeared - the killing blow of every floor silently ate its own loot, which
-    /// COMBAT_DESIGN.md §2½ ("never destroyed and never lost") forbids.
+    /// IMPLEMENTED.md -> "Bag / Inventory" ("never destroyed and never lost") forbids.
     /// </summary>
     private void CollectUncollectedDrops()
     {

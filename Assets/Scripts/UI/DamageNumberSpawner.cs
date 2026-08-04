@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Spawns floating combat text above entities: damage, crit, MISS, PARRY, and
-/// heal numbers (COMBAT_DESIGN.md §6). Self-bootstrapping singleton like
+/// heal numbers (IMPLEMENTED.md -> "Combat feedback"). Self-bootstrapping singleton like
 /// TurnManager/GameManager, except Instance creates itself on first use so no
 /// manual scene setup is required to get feedback working.
 ///
@@ -41,7 +41,7 @@ public class DamageNumberSpawner : MonoBehaviour
     [SerializeField] private float normalCharacterSize = 0.1f;
     [SerializeField] private float bigCharacterSize = 0.14f;
 
-    // COMBAT_DESIGN.md §6 damage-number colors.
+    // IMPLEMENTED.md -> "Combat feedback": damage-number colors.
     private static readonly Color MissColor = new Color(0.75f, 0.75f, 0.75f);
     private static readonly Color ParryColor = new Color(0.35f, 0.55f, 1f);
     private static readonly Color CritColor = Color.yellow;

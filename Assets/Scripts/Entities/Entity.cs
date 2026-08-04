@@ -16,21 +16,23 @@ public class Entity : MonoBehaviour
     // SpriteRenderer.color is a multiplicative tint, so it can only darken/
     // recolor a sprite, never brighten it to true white - flashing to a
     // strong red reads clearly as "just hit" without needing a custom
-    // shader. A literal white flash (COMBAT_DESIGN.md §6) would need an
+    // shader. A literal white flash (IMPLEMENTED.md -> "Combat feedback") would need an
     // additive-blend material as a later upgrade.
     [SerializeField] private Color hitFlashColor = new Color(1f, 0.35f, 0.35f);
     [SerializeField] private float hitFlashSeconds = 0.08f;
 
     public int CurrentHealth { get; protected set; }
 
-    /// <summary>baseStats plus every equipped item's bonusStats (COMBAT_DESIGN.md §2),
+    /// <summary>baseStats plus every equipped item's bonusStats (IMPLEMENTED.md -> "Equipment"),
     /// if this Entity has an Equipment component. Computed fresh each access, not cached.</summary>
     public Stats Stats => equipment != null ? baseStats + equipment.TotalBonusStats : baseStats;
     public int MaxHealth => Stats.maxHp;
 
     /// <summary>Weapon family currently in MainHand — drives CombatResolver's
-    /// scaling/defense stat pick and Parry eligibility (§1, §4). Unarmed
-    /// (None) if there's no Equipment component or MainHand is empty.</summary>
+    /// scaling/defense stat pick (IMPLEMENTED.md -> "Stat system") and Parry
+    /// eligibility, and later attack pattern (ROADMAP.md -> "Weapon-driven
+    /// attack patterns"). Unarmed (None) if there's no Equipment component
+    /// or MainHand is empty.</summary>
     public virtual WeaponType EquippedWeaponType => equipment != null ? equipment.EquippedWeaponType : WeaponType.None;
 
     /// <summary>Flat weapon damage from the equipped MainHand item (§2). 0 if unarmed.</summary>
@@ -76,8 +78,8 @@ public class Entity : MonoBehaviour
     }
 
     /// <summary>
-    /// Buffs this entity's stats (deeper-floor scaling, COMBAT_DESIGN.md §2c).
-    /// Call right after Instantiate: Awake has already set CurrentHealth from
+    /// Buffs this entity's stats (used for GameManager's per-floor enemy
+    /// scaling). Call right after Instantiate: Awake has already set CurrentHealth from
     /// the prefab's baseStats, so it's refilled here to the new max.
     /// </summary>
     public void ApplyStatBonus(Stats bonus)
@@ -89,7 +91,7 @@ public class Entity : MonoBehaviour
 
     /// <summary>
     /// Called by Equipment after any Equip/Unequip so CurrentHealth stays valid
-    /// against the new total max (COMBAT_DESIGN.md §2). Only clamps down if max
+    /// against the new total max (IMPLEMENTED.md -> "Equipment"). Only clamps down if max
     /// HP decreased (e.g. unequipping a +HP item); doesn't top up CurrentHealth
     /// if max HP increased, so gear-swapping can't be used to free-heal.
     /// </summary>
@@ -164,7 +166,7 @@ public class Entity : MonoBehaviour
         CombatResult result = CombatResolver.Resolve(this, target);
         OnAttackResolved?.Invoke(this, target, result);
         DamageNumberSpawner.Instance.ShowAttackResult(target, result);
-        // COMBAT_DESIGN.md §6: crits get a small screen shake. Called directly for
+        // IMPLEMENTED.md -> "Combat feedback": crits get a small screen shake. Called directly for
         // the same reason as DamageNumberSpawner above - only one listener today.
         if (result.WasCrit) CameraShake.Shake(0.05f, 0.12f);
 

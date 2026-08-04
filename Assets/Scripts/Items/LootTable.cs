@@ -1,10 +1,11 @@
 using UnityEngine;
 
 /// <summary>
-/// Weighted drop table an enemy rolls against on death (COMBAT_DESIGN.md §2
-/// "Drops"). Each entry's EquippableItem already carries its own fixed
-/// rarity/stats (§2 "EquippableItem stats"), so rolling a table entry rolls
-/// both "which item" and "how rare" at once - no separate rarity-roll step.
+/// Weighted drop table an enemy rolls against on death. Each entry's
+/// EquippableItem already carries its own fixed rarity/stats, so rolling a
+/// table entry rolls both "which item" and "how rare" at once - no separate
+/// rarity-roll step. No asset of this type has been authored yet, so no
+/// enemy actually rolls one - see IN_PROGRESS.md -> "1b. Enemy loot".
 /// </summary>
 [CreateAssetMenu(menuName = "Items/Loot Table")]
 public class LootTable : ScriptableObject

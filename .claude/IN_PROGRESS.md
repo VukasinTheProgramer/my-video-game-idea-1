@@ -93,15 +93,19 @@ so it cannot be deferred past the format. Parked in `ROADMAP.md` →
 Not started, and correctly behind weapon-driven attack patterns in the build
 order.
 
-## 3. Deferred: source-comment citation sweep
+## 3. ~~Deferred: source-comment citation sweep~~ — DONE 2026-08-04
 
-~40 comments across 25 `.cs` files still cite `COMBAT_DESIGN.md §N`, which no
-longer exists (`Stats.cs` "§1/§1a", `Entity.cs` "§6", `Rarity.cs` "§2c", …).
-Comment-only, so zero compile risk, but each needs a judgment call on which
-new section it means — not a `sed` job.
+All 38 `COMBAT_DESIGN.md §N` comments across 22 `.cs` files repointed to
+`IMPLEMENTED.md`/`ROADMAP.md`/`IN_PROGRESS.md` section titles, each read in
+context rather than mechanically replaced — several old numbers (`§1`, `§2c`)
+meant different things in different files depending on whether the claim
+next to them was shipped or planned, so a blind `sed` would have mis-mapped
+some. Confirmed zero remaining hits by grep, and a full headless recompile
+came back with zero errors and zero warnings (comment-only change, no
+behavior touched).
 
-`CLAUDE.md` §6 now says to cite by **section title, not number**, so anything
-touched from here on should follow that.
+`CLAUDE.md` §6 already says to cite by **section title, not number**, so this
+class of rot shouldn't recur.
 
 ## 4. ~~Unverified: the 15-slot commit never got a headless compile~~ — CLOSED
 
