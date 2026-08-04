@@ -1,17 +1,20 @@
 # Implemented
 
-What's built in the game right now. Reference game for combat feel: **Bit
-Heroes Quest** (Kongregate). See `ROADMAP.md` for anything designed but not
-yet built.
+Features that **actually run in the game** — the C# exists *and* the scene or
+prefab references it. Reference game for combat feel: **Bit Heroes Quest**
+(Kongregate).
 
-"Built" means the **C# exists** — it does *not* prove the scene or prefabs
-reference it (`CLAUDE.md` §0: that's this project's worst bug class). Sections
-carrying **⚠️** describe finished code that never runs because serialized data
-doesn't point at it. Verify anything load-bearing before relying on it:
+- `ROADMAP.md` — designed, no code yet.
+- `IN_PROGRESS.md` — code written but **not wired**, so it never executes.
+  Nothing belongs in this file until it's wired.
+
+Entry bar for this file, because "the C# is correct" proved nothing here twice
+(`CLAUDE.md` §0):
 
 ```bash
 grep -h '^guid:' Assets/Scripts/Path/Thing.cs.meta
 grep -c "<that-guid>" Assets/Scenes/Main.unity Assets/Prefabs/Player.prefab
+# 0 hits = it never runs = it goes in IN_PROGRESS.md, not here
 ```
 
 ---
@@ -55,53 +58,16 @@ Level 1 baseline (before gear): Max HP 101 (100 flat + 1 Health point), ATK
 1, AGI 1, MAG 0 (gear-only), DEF 5, MDEF 5 (flat innate toughness, everything
 past that from gear).
 
-## Leveling & stat points — ⚠️ WRITTEN BUT NOT WIRED, DOES NOTHING
-
-**This section describes code that never executes.** `PlayerProgression` is
-**not a component on `Player.prefab`** (which carries only `PlayerController`,
-`DirectionalSpriteAnimator`, `Equipment`, `Inventory`), and nothing adds it at
-runtime. Every caller fetches it defensively — `progression?.AddXP(xpReward)`
-in `EnemyController.Die`, `player.GetComponent<PlayerProgression>()` in
-`EquipmentPanelUI` — so XP is never granted, no level-up ever fires, and no
-stat point is ever spendable. Silently: no error, no warning.
-
-Adding the component to the prefab is the whole fix; the logic below is
-complete and correct. Kept in this file rather than `ROADMAP.md` because the
-code is written, not planned.
-
-`PlayerProgression` component (intended to sit on the player next to
-`PlayerController`):
-
-- **XP**: flat amount per enemy (`EnemyController.xpReward`, default 10,
-  hand-tuned per enemy like `lootTable`), granted to the killer on `Die()`.
-- **XP curve**: escalating cost per level —
-  `xpToNextLevel = baseXPToLevel2 + (level - 1) * xpGrowthPerLevel`
-  (defaults 100, +50/level). Both tunable in the Inspector. No level cap.
-- **Points per level-up**: 1, spendable on **Attack / Health / Agility
-  only** (Magic/DEF/MDEF stay gear-only). Flat 1:1 — 1 point = +1 to that
-  stat (or +1 Max HP for Health).
-- **Starting pool**: 10 free points at character creation, spent through
-  the same system as level-up points.
-- **No respec** — once spent, permanent.
-- UI lives in `EquipmentPanelUI`: Level/XP readout, available-points count,
-  one + button each for Attack/Health/Agility (disabled at 0 points).
-- Events (`OnXPChanged`, `OnLevelUp`, `OnStatPointsChanged`) let UI react
-  without polling.
-
 ## Equipment
 
-15 slots exist on `EquipmentSlot`: **Head, Neck, MainHand, OffHand,
-Shoulders, Chest, Hands, Back, Legs, Feet** (rendered as layered LPC sprites
-via `Equipment`, kept in sync with the base body's animation frame) plus
-**Belt, Ring1, Ring2, Trinket1, Trinket2** (stat-only — no LPC art, so they
-never render a visible layer, they just contribute to `TotalBonusStats`).
-`EquipmentLayerOrder.Fixed` has a sorting-order entry for every slot,
-including a shared `StatOnlyOrder` constant for the 5 stat-only ones.
+**10 working slots**: Head, Neck, MainHand, OffHand, Shoulders, Chest, Hands,
+Back, Legs, Feet — rendered as layered LPC sprites via `Equipment`, kept in
+sync with the base body's animation frame.
 
-⚠️ `Main.unity` still wires only **10** `slotUIs`/`slotLabels`. The length
-guards in `EquipmentPanelUI.Refresh` mean this doesn't throw — the last five
-(Belt, Ring1, Ring2, Trinket1, Trinket2) simply have no UI square, so they
-can't be equipped from the panel even though `Equipment` handles them fine.
+`EquipmentSlot` also declares 5 stat-only slots (Belt, Ring1, Ring2, Trinket1,
+Trinket2) with `EquipmentLayerOrder` entries and a shared `StatOnlyOrder`
+constant, but `Main.unity` wires only 10 slot UIs — so they can't be equipped
+from the panel and aren't usable yet. See `IN_PROGRESS.md`.
 
 `EquippableItem` (ScriptableObject) fields: `slot`, `displayName`,
 `bonusStats` (Stats, added while equipped), `weaponDamage` (MainHand only),
@@ -178,31 +144,16 @@ adjacent-attack if no `BattleManager` exists in the scene.
   follow position each frame (avoids two systems fighting over the
   camera's transform). Triggered on crit via `Entity.Attack`.
 
-## Enemy loot — ⚠️ NO DROPS ACTUALLY HAPPEN
-
-`EnemyController.Die()` is written to roll `LootTable` (ScriptableObject,
-weighted drops) and spawn an `EquipmentDropPickup` on the enemy's cell, and
-`GameManager` does track spawned drops for floor-transition cleanup.
-
-But **no `LootTable` asset has ever been created** — only the script — and
-`Enemy.prefab` serializes `lootTable: {fileID: 0}` (null). So the roll is
-skipped and enemies drop nothing. The XP grant on the same code path is dead
-too, for the separate reason above.
-
-Fix is two pieces of data, no code: author a `LootTable` asset and assign it
-on `Enemy.prefab`.
-
 ## Key files
 
 | Area | File |
 |------|------|
 | Stats & combat math | `Assets/Scripts/Core/Stats.cs`, `Assets/Scripts/Core/CombatResolver.cs` |
-| Leveling | `Assets/Scripts/Core/PlayerProgression.cs` |
 | Entity base | `Assets/Scripts/Entities/Entity.cs` |
 | Player / enemy | `Assets/Scripts/Entities/PlayerController.cs`, `Assets/Scripts/Entities/EnemyController.cs` |
 | Equipment | `Assets/Scripts/Equipment/Equipment.cs`, `EquippableItem.cs`, `EquipmentSlot.cs`, `WeaponType.cs`, `Rarity.cs`, `RarityVisuals.cs` |
 | Bag | `Assets/Scripts/Equipment/Inventory.cs` |
-| Items on the floor | `Assets/Scripts/Items/ItemPickup.cs`, `HealthPotionPickup.cs`, `EquipmentDropPickup.cs`, `LootTable.cs` |
+| Items on the floor | `Assets/Scripts/Items/ItemPickup.cs`, `HealthPotionPickup.cs`, `EquipmentDropPickup.cs` |
 | Battle screen | `Assets/Scripts/Managers/BattleManager.cs`, `Assets/Scripts/UI/BattleScreenUI.cs` |
 | Equipment/bag UI | `Assets/Scripts/UI/EquipmentPanelUI.cs`, `ItemSlotUI.cs`, `ItemTooltipUI.cs` |
 | Feedback | `Assets/Scripts/UI/DamageNumberSpawner.cs`, `DamageNumberMotion.cs`, `UI/CameraShake.cs`, `Core/CameraFollow.cs` |

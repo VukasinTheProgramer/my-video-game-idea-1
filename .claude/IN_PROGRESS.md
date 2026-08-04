@@ -5,9 +5,15 @@ The third bucket alongside the other two:
 
 | File | Holds |
 |------|-------|
-| `IMPLEMENTED.md` | Code that exists (⚠️ marks code that exists but never runs) |
-| `ROADMAP.md` | Designed, not built |
-| `.claude/IN_PROGRESS.md` | Mid-flight work, found-but-unfixed bugs, decisions waiting on the user |
+| `IMPLEMENTED.md` | Runs in the game — C# exists **and** scene/prefab references it |
+| `IN_PROGRESS.md` | Code written but not wired, found-but-unfixed bugs, decisions waiting on the user |
+| `ROADMAP.md` | Designed, no code |
+
+The split that matters is between this file and `IMPLEMENTED.md`: **written is
+not wired.** A finished, correct, compiling class that no scene object
+references does nothing at all, and Unity reports no error for it
+(`CLAUDE.md` §0). That is the single most expensive bug class in this project,
+so it gets its own bucket instead of a footnote in the "done" list.
 
 Rule: an item leaves this file in one direction only — **finished** (write it
 into `IMPLEMENTED.md`), **deferred** (move to `ROADMAP.md`), or **dropped**
@@ -37,6 +43,50 @@ greps, since a partial success here looks identical to a full one.
 Also unresolved: `Enemy.prefab` has **no `xpReward` key**, so it silently
 falls back to the C# default of 10. Harmless today only because the XP path
 is dead — becomes a real tuning bug the moment `PlayerProgression` is wired.
+
+### 1a. Leveling & stat points — the logic that isn't running
+
+Moved out of `IMPLEMENTED.md`: this is complete, correct code that executes
+zero times. Wiring the component is the entire fix — none of the below needs
+rewriting.
+
+`PlayerProgression` (belongs on the player, next to `PlayerController`):
+
+- **XP**: flat amount per enemy (`EnemyController.xpReward`, default 10,
+  hand-tuned per enemy like `lootTable`), granted to the killer on `Die()`.
+- **XP curve**: escalating cost per level —
+  `xpToNextLevel = baseXPToLevel2 + (level - 1) * xpGrowthPerLevel`
+  (defaults 100, +50/level). Both Inspector-tunable. No level cap.
+- **Points per level-up**: 1, spendable on **Attack / Health / Agility only**
+  (Magic/DEF/MDEF stay gear-only). Flat 1:1 — 1 point = +1 to that stat, or
+  +1 Max HP for Health.
+- **Starting pool**: 10 free points at character creation, spent through the
+  same system as level-up points.
+- **No respec** — once spent, permanent. (`ROADMAP.md`'s currency design puts
+  a gold-priced respec on the table, which would deliberately reverse this.)
+- UI already exists in `EquipmentPanelUI`: Level/XP readout, available-points
+  count, one + button each for Attack/Health/Agility, disabled at 0 points.
+- Events `OnXPChanged` / `OnLevelUp` / `OnStatPointsChanged` so UI reacts
+  without polling.
+
+Note `Stats.Level1Default()` hardcodes the post-spend Level 1 baseline (Max HP
+101, ATK 1, AGI 1), so the 10 starting points are currently baked in rather
+than spendable. Reconcile when wiring, or the player gets them twice.
+
+### 1b. Enemy loot — the drop path that never rolls
+
+Also moved out of `IMPLEMENTED.md`. `EnemyController.Die()` is written to roll
+`LootTable` (ScriptableObject, weighted drops) and spawn an
+`EquipmentDropPickup` on the enemy's cell, and `GameManager` does already
+track spawned drops for floor-transition cleanup. That half works.
+
+What's missing is data: **no `LootTable` asset was ever authored**, and
+`Enemy.prefab` serializes `lootTable: {fileID: 0}`. The roll is skipped.
+
+When authoring the asset, know that `LootTable` returns the shared
+ScriptableObject **template** — two drops of one entry are the *same
+reference*, which is why `Equipment.Equip` early-returns on an already-worn
+item. Per-drop stat rolls are `ROADMAP.md` → "Item generation".
 
 ## 2. Currency — designed, needs a decision before any code
 

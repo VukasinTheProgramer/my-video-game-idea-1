@@ -3,17 +3,21 @@
 Unity 2D top-down turn-based pixel dungeon crawler. Unity **6000.0.80f1**, macOS.
 Reference game for combat feel: **Bit Heroes Quest**.
 
-Read this before touching anything. `IMPLEMENTED.md` is what actually ships
-today, `ROADMAP.md` is what's designed but unbuilt, `.claude/IN_PROGRESS.md` is
-mid-flight work and open questions — this file is *how to work on the project
-without breaking it*.
+This file is *how to work on the project without breaking it*. Project state
+lives in three files under `.claude/`:
+
+| File | Holds |
+|------|-------|
+| `.claude/IMPLEMENTED.md` | Runs in the game — code exists **and** scene/prefab references it |
+| `.claude/IN_PROGRESS.md` | Written but not wired, found-but-unfixed bugs, decisions pending |
+| `.claude/ROADMAP.md` | Designed, no code |
 
 **Start a session by reading `.claude/IN_PROGRESS.md`.** It currently lists
 three systems that are fully written and never execute.
 
-(Both replaced the old `COMBAT_DESIGN.md`, which mixed the two and marked
-non-functional things ✅. Citations below point at section titles, not
-numbers, so they survive the next reshuffle.)
+(All three replaced the old `COMBAT_DESIGN.md`, which mixed spec with status
+and marked non-functional things ✅. Citations below name section *titles*, not
+numbers, so the next reshuffle doesn't break them.)
 
 ---
 
@@ -159,7 +163,7 @@ formula; `Entity.Attack` is its only caller. There are two *entry points*:
    `BattleManager` is in the scene.
 
 **Do not "consolidate" these by deleting the fallback.** It is by design
-(`IMPLEMENTED.md` → "Battle screen (encounter flow)").
+(`.claude/IMPLEMENTED.md` → "Battle screen (encounter flow)").
 
 ### Rendering: layered equipment
 
@@ -229,10 +233,10 @@ direction comes out mirrored.
   soft-lock. `BattleManager` with a null `screenUI` used to set `IsActive = true`
   with no way to attack — freezing player input and every enemy, forever, with an
   empty console. Now it errors and lets the inline fallback carry the game.
-- **Never silently discard player property.** `IMPLEMENTED.md` → "Bag /
-  Inventory": an item is
-  never destroyed. `PickUp` returns `bool`; the caller destroys the pickup **only**
-  on `true`, otherwise it goes back on the grid. Same reasoning made
+- **Never silently discard player property.** `.claude/IMPLEMENTED.md` → "Bag /
+  Inventory": an item is never destroyed. `PickUp` returns `bool`; the caller
+  destroys the pickup **only** on `true`, otherwise it goes back on the grid.
+  Same reasoning made
   `DungeonGrid.PlaceItem` return `bool` instead of overwriting an occupied cell.
 - **Guard optional components, error on required ones.** `TryGetComponent` +
   `LogWarning` for optional; `[RequireComponent]` for genuinely required.
@@ -253,9 +257,9 @@ direction comes out mirrored.
 **Fix bugs. Surface design decisions — don't silently redesign.**
 
 Live example, deliberately **not** changed: the flat `max(1, raw - DEF)` in
-`IMPLEMENTED.md` → "Stat system", combined with that same section's Level 1
-baseline of DEF 5 and ATK 1, means enemy hits
-and enemy **crits** both deal exactly 1 damage, while the UI shows a yellow crit
+`.claude/IMPLEMENTED.md` → "Stat system", combined with that same section's
+Level 1 baseline of DEF 5 and ATK 1, means enemy hits and enemy **crits** both
+deal exactly 1 damage, while the UI shows a yellow crit
 number. The code implements the doc faithfully — the *doc* produces the
 degenerate result. Changing the formula would be redesigning combat feel. It was
 reported with two options for the user to choose from instead.
@@ -272,7 +276,7 @@ section) and in others the doc was (`WeaponType.None` must **not** parry).
 Match the surrounding code — it has a consistent voice worth preserving.
 
 - Comments explain **why**, and cite the spec by **section title, not number**
-  (`ROADMAP.md → "Weapon handedness & shields"`) — the old numbered citations
+  (`.claude/ROADMAP.md → "Weapon handedness & shields"`) — the old numbered citations
   all died with `COMBAT_DESIGN.md`. Comments that merely restate the code are
   noise.
 - When taking a deliberate shortcut, say so and name the upgrade path. Existing
@@ -291,44 +295,25 @@ Match the surrounding code — it has a consistent voice worth preserving.
 
 ## 7. Current state
 
-Feature-by-feature status lives in **`IMPLEMENTED.md`** (shipped) and
-**`ROADMAP.md`** (planned). Don't duplicate that list here — it drifts. Two
-copies already disagreed, which is how the dead systems below went unnoticed.
+**Not documented here — on purpose.** A status list in this file plus a status
+list in `.claude/` is two copies that drift, and they already did: they
+disagreed about loot, which is how two entirely dead systems sat unnoticed
+through three code reviews.
 
-**Authored but NOT wired — the code exists, runs never.** This is §0's bug
-class, and it is currently live in two systems:
+Read `.claude/IN_PROGRESS.md` first (what's broken or half-done, including
+three systems that are written and never execute), then
+`.claude/IMPLEMENTED.md` (what genuinely runs) and `.claude/ROADMAP.md`
+(what's only designed).
 
-- **`PlayerProgression` is not on `Player.prefab`.** Its four components are
-  `PlayerController`, `DirectionalSpriteAnimator`, `Equipment`, `Inventory`.
-  Nothing `AddComponent`s it, and every caller null-guards
-  (`progression?.AddXP(xpReward)`, `EquipmentPanelUI`'s `GetComponent`), so
-  **XP, levels and stat points silently do nothing** — no error, no warning.
-  `Assets/Scripts/Core/PlayerProgression.cs` is fully written and unreachable.
-- **No `LootTable` asset exists** (only the script), and `Enemy.prefab` has
-  `lootTable: {fileID: 0}`. `EnemyController.Die` never drops gear.
-
-Verify with the §0 recipe before trusting any "it's built" claim:
+Before trusting *any* "it's built" claim in those files, spend ten seconds on
+the §0 recipe:
 
 ```bash
-grep -h '^guid:' Assets/Scripts/Core/PlayerProgression.cs.meta
+grep -h '^guid:' Assets/Scripts/Core/Thing.cs.meta
 grep -c "<that-guid>" Assets/Scenes/Main.unity Assets/Prefabs/Player.prefab
+# 0 = the script is unreachable, whatever the docs say
 ```
 
-**Known gaps — do not assume these work:**
-
-- **`Main.unity` wires only 10 `slotUIs`** but `EquipmentPanelUI.SlotOrder` now
-  has 15. Length guards keep it from throwing, so Belt/Ring1/Ring2/Trinket1/
-  Trinket2 just never render.
-- **Damage numbers are invisible during battles** — world-space `TextMesh` at
-  dungeon positions, behind a 0.97-alpha overlay canvas.
-- Battle turns are **manual** (Attack button / Space), not auto-resolving.
-- Strictly **1v1**. No party, no multi-enemy encounters, no fleeing.
-- Item scaling by floor/rarity does not exist (`ROADMAP.md` → "Item
-  generation") — `LootTable` returns the shared ScriptableObject **template**,
-  so two drops of one entry are the *same reference*. (This is why
-  `Equipment.Equip` must early-return when re-equipping an already-worn item.)
-- Not built: weapon-driven attack patterns, enemy archetypes beyond Brute,
-  boss telegraphs, companion, pixel-perfect camera, audio — all in `ROADMAP.md`.
-- **`README.md` is badly stale** — it claims no Unity project exists yet and
-  describes AI that was replaced by BFS. Treat this file, `IMPLEMENTED.md` and
-  `ROADMAP.md` as authoritative.
+`README.md` is written for a human arriving at the repo and duplicates some of
+this status by nature. It's currently **stale** on loot and skill points —
+treat `.claude/` as authoritative when they conflict.
