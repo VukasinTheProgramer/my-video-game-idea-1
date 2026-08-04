@@ -85,20 +85,31 @@ drops of one entry are the *same reference*, which is why `Equipment.Equip`
 early-returns on an already-worn item. Per-drop stat rolls are `ROADMAP.md` →
 "Item generation".
 
-## 2. Currency — designed, needs a decision before any code
+## 2. Currency — step 1 done, steps 2-5 remain
 
-Design is written up in `ROADMAP.md` → "Currency: gold & gems". Decided:
-gold + gems, gold persists across runs, four gold sinks (shop, selling from
-bag, upgrade/reforge, priced respec).
+Design is written up in `ROADMAP.md` → "Currency: gold & gems". Build order
+was: 1) Wallet + gold drops + HUD, 2) sell-from-bag, 3) merchant shop,
+4) save/persistence, 5) gems.
 
-**Blocked on:** persistence means building a save system, and the save
+**Step 1 shipped 2026-08-04**, out of build order relative to
+weapon-driven attack patterns (user-requested, not a redesign) — see
+`IMPLEMENTED.md` → "Currency". `Wallet` component, gold rolled on
+`EnemyController.Die()` scaled by floor, live HUD counter. Verified live via
+a real kill through `Entity.TakeDamage` → `Die()`, not a synthetic call:
+wallet went 0 → 4 (within the configured 2-5 range) and the HUD text updated
+to match in the same frame.
+
+Gold currently has **no sink** — nothing to spend it on. That's expected at
+this stage (step 2, selling from the bag, is next), not a bug.
+
+**Still blocked:** step 4 (persistence) needs a save system, and the save
 *format* commits to what else persists — level, stat points, bag, equipped
 gear. That choice picks the genre (meta-progression vs roguelike-with-a-bank),
 so it cannot be deferred past the format. Parked in `ROADMAP.md` →
-"Open / undecided".
+"Open / undecided". Step 5 (gems) is separately blocked on item generation
+(`ROADMAP.md` → "Item generation"), not started.
 
-Not started, and correctly behind weapon-driven attack patterns in the build
-order.
+Steps 2-3 (selling, shop) are **not** blocked — just not built yet.
 
 ## 3. ~~Deferred: source-comment citation sweep~~ — DONE 2026-08-04
 

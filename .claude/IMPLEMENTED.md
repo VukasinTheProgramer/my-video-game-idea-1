@@ -128,6 +128,24 @@ prefab needed.
 `EquipmentDropPickup`/`HealthPotionPickup` both derive from an abstract
 `ItemPickup`; picking up a drop adds it to the bag, never auto-equips.
 
+## Currency
+
+`Wallet` (component on the player, mirrors `Inventory`/`PlayerProgression`'s
+pattern): `Gold` int, `AddGold`, `TrySpendGold` (returns `bool`, only commits
+on `true` — same reasoning as `ItemPickup.PickUp`), `OnGoldChanged` event.
+Gold only — no gems yet, see `ROADMAP.md` → "Currency: gold & gems".
+
+`EnemyController.Die()` rolls a flat range (`goldRewardMin`/`Max`, default
+2–5, hand-tuned per enemy like `xpReward`) plus a per-floor bonus GameManager
+applies at spawn (`goldBonusPerFloor`, same mechanism as enemy stat scaling)
+and grants it to the killer's `Wallet`. `GoldHUDUI` shows a live "Gold: N"
+readout, always-visible HUD text next to the floor indicator, not inside the
+toggled character panel.
+
+No sink exists yet — gold currently has nothing to spend it on. See
+`IN_PROGRESS.md` → "2. Currency" for the rest of the build order (selling,
+shop, persistence, gems).
+
 ## Battle screen (encounter flow)
 
 Combat is **not** inline on the grid. `BattleManager` (singleton) opens a
@@ -191,6 +209,7 @@ an item's actual numbers) are `ROADMAP.md` → "Item generation", not this.
 | Player / enemy | `Assets/Scripts/Entities/PlayerController.cs`, `Assets/Scripts/Entities/EnemyController.cs` |
 | Equipment | `Assets/Scripts/Equipment/Equipment.cs`, `EquippableItem.cs`, `EquipmentSlot.cs`, `WeaponType.cs`, `Rarity.cs`, `RarityVisuals.cs` |
 | Bag | `Assets/Scripts/Equipment/Inventory.cs` |
+| Currency | `Assets/Scripts/Core/Wallet.cs`, `Assets/Scripts/UI/GoldHUDUI.cs` |
 | Items on the floor | `Assets/Scripts/Items/ItemPickup.cs`, `HealthPotionPickup.cs`, `EquipmentDropPickup.cs`, `LootTable.cs` |
 | Battle screen | `Assets/Scripts/Managers/BattleManager.cs`, `Assets/Scripts/UI/BattleScreenUI.cs` |
 | Equipment/bag UI | `Assets/Scripts/UI/EquipmentPanelUI.cs`, `ItemSlotUI.cs`, `ItemTooltipUI.cs` |

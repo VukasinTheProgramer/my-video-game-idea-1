@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 278399393044879617}
   - component: {fileID: 220388143345248758}
   - component: {fileID: 4149791413987786252}
+  - component: {fileID: 5318726063475737938}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -224,3 +225,15 @@ MonoBehaviour:
   pointsPerLevelUp: 1
   baseXPToLevel2: 100
   xpGrowthPerLevel: 50
+--- !u!114 &5318726063475737938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6677007772541466471}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f38fb1937767944e48952794dd59e8dd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

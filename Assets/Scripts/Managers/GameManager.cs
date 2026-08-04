@@ -36,6 +36,9 @@ public class GameManager : MonoBehaviour
     [Tooltip("Bonus enemy damage, applied every 2 floors to keep it gentler than health.")]
     [SerializeField] private int enemyDamagePerFloor = 1;
 
+    [Tooltip("Bonus gold per enemy kill, added per floor past the first (ROADMAP.md -> \"Currency: gold & gems\").")]
+    [SerializeField] private int goldBonusPerFloor = 1;
+
     public int CurrentFloor { get; private set; } = 1;
     public event Action<int> OnFloorChanged;
 
@@ -171,6 +174,7 @@ public class GameManager : MonoBehaviour
             maxHp = floorStep * enemyHealthPerFloor,
             attack = (floorStep / 2) * enemyDamagePerFloor,
         };
+        int goldFloorBonus = floorStep * goldBonusPerFloor;
 
         // Rooms after the player's starting room get enemies; deeper floors pack in more.
         for (int roomIndex = 1; roomIndex < roomCount; roomIndex++)
@@ -182,6 +186,7 @@ public class GameManager : MonoBehaviour
 
                 EnemyController enemy = Instantiate(enemyPrefab);
                 enemy.ApplyStatBonus(floorBonus);
+                enemy.SetGoldFloorBonus(goldFloorBonus);
                 enemy.SpawnAt(spawnCell);
                 enemy.OnDeath += HandleEnemyDeath;
                 enemy.OnLootDropped += HandleLootDropped;
@@ -199,6 +204,7 @@ public class GameManager : MonoBehaviour
             {
                 EnemyController enemy = Instantiate(enemyPrefab);
                 enemy.ApplyStatBonus(floorBonus);
+                enemy.SetGoldFloorBonus(goldFloorBonus);
                 enemy.SpawnAt(fallbackCell);
                 enemy.OnDeath += HandleEnemyDeath;
                 enemy.OnLootDropped += HandleLootDropped;

@@ -13,6 +13,16 @@ public class EnemyController : Entity
     [Tooltip("Flat XP granted to the player on a kill (IMPLEMENTED.md -> \"Leveling & stat points\") - tune per enemy type/floor tier directly, no formula.")]
     [SerializeField] private int xpReward = 10;
 
+    [Tooltip("Gold rolled on a kill (ROADMAP.md -> \"Currency: gold & gems\") - min/max are the floor-1 baseline; GameManager adds a flat per-floor bonus at spawn time, same mechanism as enemy stat scaling.")]
+    [SerializeField] private int goldRewardMin = 2;
+    [SerializeField] private int goldRewardMax = 5;
+
+    private int goldFloorBonus;
+
+    /// <summary>Set by GameManager at spawn, alongside ApplyStatBonus - the same
+    /// per-floor scaling hook, applied to gold instead of Stats.</summary>
+    public void SetGoldFloorBonus(int bonus) => goldFloorBonus = bonus;
+
     /// <summary>Fires once, right after a loot drop is spawned on death - GameManager
     /// subscribes to track it for floor-cleanup. Only fires once a LootTable
     /// asset exists to roll against - see IN_PROGRESS.md -> "1b. Enemy loot".</summary>
@@ -102,6 +112,10 @@ public class EnemyController : Entity
         {
             PlayerProgression progression = player.GetComponent<PlayerProgression>();
             progression?.AddXP(xpReward);
+
+            Wallet wallet = player.GetComponent<Wallet>();
+            int gold = UnityEngine.Random.Range(goldRewardMin, goldRewardMax + 1) + goldFloorBonus;
+            wallet?.AddGold(gold);
         }
 
         base.Die();
