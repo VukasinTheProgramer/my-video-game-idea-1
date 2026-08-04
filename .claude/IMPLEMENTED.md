@@ -58,6 +58,28 @@ Level 1 baseline (before gear): Max HP 101 (100 flat + 1 Health point), ATK
 1, AGI 1, MAG 0 (gear-only), DEF 5, MDEF 5 (flat innate toughness, everything
 past that from gear).
 
+## Leveling & stat points
+
+`PlayerProgression` (component on the player, next to `PlayerController`):
+
+- **XP**: flat amount per enemy (`EnemyController.xpReward`, default 10,
+  hand-tuned per enemy like `lootTable`), granted to the killer on `Die()`.
+- **XP curve**: escalating cost per level —
+  `xpToNextLevel = baseXPToLevel2 + (level - 1) * xpGrowthPerLevel`
+  (defaults 100, +50/level). Both Inspector-tunable. No level cap.
+- **Points per level-up**: 1, spendable on **Attack / Health / Agility only**
+  (Magic/DEF/MDEF stay gear-only). Flat 1:1 — 1 point = +1 to that stat, or
+  +1 Max HP for Health.
+- **Starting pool**: 10 free points at character creation, spent through the
+  same system as level-up points. Separate from `Stats.Level1Default()`,
+  which is the plain pre-spend baseline — no double-grant.
+- **No respec** — once spent, permanent. (`ROADMAP.md`'s currency design puts
+  a gold-priced respec on the table, which would deliberately reverse this.)
+- UI lives in `EquipmentPanelUI`: Level/XP readout, available-points count,
+  one + button each for Attack/Health/Agility, disabled at 0 points.
+- Events `OnXPChanged` / `OnLevelUp` / `OnStatPointsChanged` so UI reacts
+  without polling.
+
 ## Equipment
 
 **10 working slots**: Head, Neck, MainHand, OffHand, Shoulders, Chest, Hands,
@@ -149,6 +171,7 @@ adjacent-attack if no `BattleManager` exists in the scene.
 | Area | File |
 |------|------|
 | Stats & combat math | `Assets/Scripts/Core/Stats.cs`, `Assets/Scripts/Core/CombatResolver.cs` |
+| Leveling | `Assets/Scripts/Core/PlayerProgression.cs` |
 | Entity base | `Assets/Scripts/Entities/Entity.cs` |
 | Player / enemy | `Assets/Scripts/Entities/PlayerController.cs`, `Assets/Scripts/Entities/EnemyController.cs` |
 | Equipment | `Assets/Scripts/Equipment/Equipment.cs`, `EquippableItem.cs`, `EquipmentSlot.cs`, `WeaponType.cs`, `Rarity.cs`, `RarityVisuals.cs` |

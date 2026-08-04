@@ -13,7 +13,7 @@ lives in three files under `.claude/`:
 | `.claude/ROADMAP.md` | Designed, no code |
 
 **Start a session by reading `.claude/IN_PROGRESS.md`.** It currently lists
-three systems that are fully written and never execute.
+two systems that are fully written and never execute.
 
 (All three replaced the old `COMBAT_DESIGN.md`, which mixed spec with status
 and marked non-functional things ✅. Citations below name section *titles*, not

@@ -23,55 +23,45 @@ Last updated: 2026-08-04. Branch: `testing`.
 
 ---
 
-## 1. Three dead systems — found, diagnosed, NOT fixed
+## 1. Two dead systems remain — one fixed
 
-All three are **serialized-data only**, no C# to write. This is `CLAUDE.md`
-§0's bug class, currently live in the repo. Verified 2026-08-04 by GUID grep
-against `Main.unity` / `Player.prefab` / `Enemy.prefab`.
+All **serialized-data only**, no C# to write. This is `CLAUDE.md` §0's bug
+class, currently live in the repo. Verified 2026-08-04 by GUID grep against
+`Main.unity` / `Player.prefab` / `Enemy.prefab`.
 
 | What's dead | Why | Fix |
 |---|---|---|
-| **XP / levels / stat points** | `PlayerProgression` is not a component on `Player.prefab`, and nothing `AddComponent`s it at runtime. Every caller null-guards (`progression?.AddXP(xpReward)`), so it no-ops silently — no error, no warning. | Add the component to `Player.prefab`. |
+| ~~XP / levels / stat points~~ | Fixed 2026-08-04, see below. | — |
 | **Enemy gear drops** | No `LootTable` asset was ever authored; `Enemy.prefab` serializes `lootTable: {fileID: 0}`. | Author one `LootTable` asset, assign it on the prefab. |
 | **5 stat-only equipment slots** | `Main.unity` wires 10 `slotUIs`/`slotLabels`; `EquipmentPanelUI.SlotOrder` now has 15. Length guards stop the throw, so Belt/Ring1/Ring2/Trinket1/Trinket2 just have no UI square. | Build 5 more slot UIs in the scene. |
 
-**Next action:** one throwaway headless script doing all three (`CLAUDE.md`
-§1 loop — Editor must be closed first). Wire the private `[SerializeField]`
-arrays via `SerializedObject`, and log a sentinel per fix; three separate
-greps, since a partial success here looks identical to a full one.
+**Next action:** one throwaway headless script doing both remaining fixes
+(`CLAUDE.md` §1 loop — Editor must be closed first). Wire the private
+`[SerializeField]` arrays via `SerializedObject`, and log a sentinel per fix —
+separate greps, since a partial success here looks identical to a full one.
 
-Also unresolved: `Enemy.prefab` has **no `xpReward` key**, so it silently
-falls back to the C# default of 10. Harmless today only because the XP path
-is dead — becomes a real tuning bug the moment `PlayerProgression` is wired.
+Now unresolved for real (not "harmless until wired" anymore): `Enemy.prefab`
+has **no `xpReward` key**, so it silently falls back to the C# default of 10
+for every enemy. Now that `PlayerProgression` is live, this is a live tuning
+gap — every enemy currently grants identical XP regardless of difficulty.
 
-### 1a. Leveling & stat points — the logic that isn't running
+### 1a. Leveling & stat points — FIXED 2026-08-04, moved to `IMPLEMENTED.md`
 
-Moved out of `IMPLEMENTED.md`: this is complete, correct code that executes
-zero times. Wiring the component is the entire fix — none of the below needs
-rewriting.
+`PlayerProgression` is now a component on `Player.prefab`
+(`Assets/Editor/WirePlayerProgression.cs`, run headless, deleted after).
+Verified live, not just in the YAML: a play-mode check
+(`Assets/Editor/VerifyProgressionWiring.cs`, also deleted after) spawned the
+real player via `GameManager`, called `AddXP(100)`, and confirmed
+`OnLevelUp` fired once, `Level` incremented, and `AvailableStatPoints`
+incremented — then exited 0. Full description now lives in
+`IMPLEMENTED.md` → "Leveling & stat points".
 
-`PlayerProgression` (belongs on the player, next to `PlayerController`):
+Also closes item 4 below — that same headless run was a full recompile with
+zero errors and zero warnings, covering `0821405f7` too.
 
-- **XP**: flat amount per enemy (`EnemyController.xpReward`, default 10,
-  hand-tuned per enemy like `lootTable`), granted to the killer on `Die()`.
-- **XP curve**: escalating cost per level —
-  `xpToNextLevel = baseXPToLevel2 + (level - 1) * xpGrowthPerLevel`
-  (defaults 100, +50/level). Both Inspector-tunable. No level cap.
-- **Points per level-up**: 1, spendable on **Attack / Health / Agility only**
-  (Magic/DEF/MDEF stay gear-only). Flat 1:1 — 1 point = +1 to that stat, or
-  +1 Max HP for Health.
-- **Starting pool**: 10 free points at character creation, spent through the
-  same system as level-up points.
-- **No respec** — once spent, permanent. (`ROADMAP.md`'s currency design puts
-  a gold-priced respec on the table, which would deliberately reverse this.)
-- UI already exists in `EquipmentPanelUI`: Level/XP readout, available-points
-  count, one + button each for Attack/Health/Agility, disabled at 0 points.
-- Events `OnXPChanged` / `OnLevelUp` / `OnStatPointsChanged` so UI reacts
-  without polling.
-
-Note `Stats.Level1Default()` hardcodes the post-spend Level 1 baseline (Max HP
-101, ATK 1, AGI 1), so the 10 starting points are currently baked in rather
-than spendable. Reconcile when wiring, or the player gets them twice.
+Checked and ruled out during this fix: `Stats.Level1Default()` (ATK 1, AGI 1,
+maxHp 101) is the plain pre-spend baseline, not a hidden pre-spent version of
+the 10 starting points — no double-grant risk.
 
 ### 1b. Enemy loot — the drop path that never rolls
 
@@ -113,14 +103,8 @@ new section it means — not a `sed` job.
 `CLAUDE.md` §6 now says to cite by **section title, not number**, so anything
 touched from here on should follow that.
 
-## 4. Unverified: the 15-slot commit never got a headless compile
+## 4. ~~Unverified: the 15-slot commit never got a headless compile~~ — CLOSED
 
-`0821405f7` (Torso→Chest, Arms→Hands, +5 slots) was committed without a clean
-compile run — the Editor was open and `CLAUDE.md` §1 requires closing it.
-Comment and enum changes only, and the enum ordinals were checked to be
-stable (`slot: 5` still resolves to Chest, new members appended not inserted),
-but **"probably fine" is not the standard this project holds** — §1 wants zero
-errors *and* zero warnings confirmed.
-
-Fold this into the §1 headless run above: same script, same shutdown, one
-compile check covers both.
+Resolved as a side effect of §1a's headless run 2026-08-04: same project,
+zero `error CS` / `warning CS` in the log, so `0821405f7` (Torso→Chest,
+Arms→Hands, +5 slots) is now confirmed to compile clean.
