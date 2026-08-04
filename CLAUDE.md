@@ -291,6 +291,11 @@ Match the surrounding code — it has a consistent voice worth preserving.
 - Self-building UI components (`ItemSlotUI`, `ItemTooltipUI`, `DamageNumberSpawner`)
   construct their own hierarchy in `Awake` so they work whether hand-placed or
   spawned at runtime, with no prefab. Keep that pattern for new UI pieces.
+  The three outro screens (`VictoryScreenUI`/`LevelUpUI`/`FloorCompleteUI`)
+  take it one step further — fully self-bootstrapping singletons (`Instance`
+  creates itself and parents under the scene's Canvas on first `Show`, same
+  idiom as `DamageNumberSpawner`/`CameraShake`), so **zero scene wiring** was
+  needed to ship them. Shared layout code is `ModalScreenUI`.
 
 ---
 

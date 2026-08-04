@@ -167,9 +167,45 @@ adjacent-attack if no `BattleManager` exists in the scene.
   at the bottom (Space/Enter also works).
 - Reuses `Entity.Attack`/`CombatResolver` completely — damage numbers, hit
   flash, crit/dodge/parry/life steal all work identically to grid combat.
-- On win: resumes the floor via `TurnManager.EndPlayerTurn()`. On player
-  death: `GameOverUI` takes over.
+- On win: shows the victory screen (see "Outro screens" below), which
+  resumes the floor via `TurnManager.EndPlayerTurn()` once dismissed. On
+  player death: `GameOverUI` takes over independently, no outro screen.
 - Not built: fleeing a battle, multi-enemy encounters, party members.
+
+## Outro screens
+
+Three full-screen modals — dim backdrop + centered popup (title, body text,
+Continue button; Space/Enter also confirms) — all self-bootstrapping
+singletons (`VictoryScreenUI`, `LevelUpUI`, `FloorCompleteUI`, same pattern
+as `DamageNumberSpawner`/`CameraShake`: no scene wiring, they build their own
+UI under the scene's Canvas the first time they're shown). Shared layout
+code lives in `ModalScreenUI`.
+
+- **`VictoryScreenUI`**: shown by `BattleManager` the instant the enemy dies,
+  right after hiding the fight overlay. Damage dealt/taken (both sides,
+  summed across the whole fight via `Entity.OnAttackResolved`), XP earned,
+  gold earned, items dropped (rarity-colored) — exact numbers via
+  `EnemyController.OnXPGranted`/`OnGoldGranted`/`OnLootDropped`, not diffed
+  from `Wallet`/`PlayerProgression` state (a diff breaks across a level-up's
+  XP rollover).
+- **`LevelUpUI`**: shown after Victory's Continue, only if that kill crossed
+  a level threshold (`PlayerProgression.OnLevelUp`, captured as the *final*
+  level reached — `AddXP` can fire it more than once off one big grant, this
+  only ever shows once per kill).
+- **`FloorCompleteUI`**: shown by `GameManager.AdvanceFloorWhenSafe` once
+  every enemy on the floor is dead, before the next floor generates.
+
+`BattleManager.IsActive` deliberately stays **true** through Victory (and
+Level Up, if shown) — `GameManager`'s floor-advance wait and the
+player/enemy turn-skip checks all key off it, so the dungeon stays frozen
+for exactly as long as an outro screen is on top of it. A separate private
+`fightOver` flag (set the instant either side dies) stops turn logic
+(`OnPlayerAttackPressed`/`RunEnemyTurn`) immediately, independent of when
+`IsActive` eventually clears.
+
+Not built: an outro screen on the inline-fallback attack path (no
+`BattleManager` in scene) — that path stays deliberately minimal by design,
+see "Battle screen (encounter flow)" above.
 
 ## Combat feedback
 
@@ -212,6 +248,7 @@ an item's actual numbers) are `ROADMAP.md` → "Item generation", not this.
 | Currency | `Assets/Scripts/Core/Wallet.cs`, `Assets/Scripts/UI/GoldHUDUI.cs` |
 | Items on the floor | `Assets/Scripts/Items/ItemPickup.cs`, `HealthPotionPickup.cs`, `EquipmentDropPickup.cs`, `LootTable.cs` |
 | Battle screen | `Assets/Scripts/Managers/BattleManager.cs`, `Assets/Scripts/UI/BattleScreenUI.cs` |
+| Outro screens | `Assets/Scripts/UI/VictoryScreenUI.cs`, `LevelUpUI.cs`, `FloorCompleteUI.cs`, `ModalScreenUI.cs` |
 | Equipment/bag UI | `Assets/Scripts/UI/EquipmentPanelUI.cs`, `ItemSlotUI.cs`, `ItemTooltipUI.cs` |
 | Feedback | `Assets/Scripts/UI/DamageNumberSpawner.cs`, `DamageNumberMotion.cs`, `UI/CameraShake.cs`, `Core/CameraFollow.cs` |
 | Turn loop / grid | `Assets/Scripts/Core/TurnManager.cs`, `DungeonGrid.cs`, `GridUtils.cs` |

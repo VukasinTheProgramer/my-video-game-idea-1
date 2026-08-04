@@ -28,6 +28,12 @@ public class EnemyController : Entity
     /// asset exists to roll against - see IN_PROGRESS.md -> "1b. Enemy loot".</summary>
     public event Action<ItemPickup> OnLootDropped;
 
+    /// <summary>Fires once on a kill with the exact amount granted - lets a victory
+    /// screen show precise numbers instead of diffing Wallet/PlayerProgression
+    /// state around the kill (which breaks across a level-up's XP rollover).</summary>
+    public event Action<int> OnXPGranted;
+    public event Action<int> OnGoldGranted;
+
     private PlayerController player;
 
     private void Start()
@@ -112,10 +118,12 @@ public class EnemyController : Entity
         {
             PlayerProgression progression = player.GetComponent<PlayerProgression>();
             progression?.AddXP(xpReward);
+            OnXPGranted?.Invoke(xpReward);
 
             Wallet wallet = player.GetComponent<Wallet>();
             int gold = UnityEngine.Random.Range(goldRewardMin, goldRewardMax + 1) + goldFloorBonus;
             wallet?.AddGold(gold);
+            OnGoldGranted?.Invoke(gold);
         }
 
         base.Die();

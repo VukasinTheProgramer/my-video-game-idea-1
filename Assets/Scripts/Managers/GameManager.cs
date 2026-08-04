@@ -275,6 +275,10 @@ public class GameManager : MonoBehaviour
             yield return null;
         }
 
+        bool continuePressed = false;
+        FloorCompleteUI.Instance.Show(CurrentFloor, () => continuePressed = true);
+        yield return new WaitUntil(() => continuePressed);
+
         CollectUncollectedDrops();
         CurrentFloor++;
         GenerateFloor();

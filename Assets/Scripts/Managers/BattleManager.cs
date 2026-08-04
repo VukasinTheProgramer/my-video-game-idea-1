@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -14,6 +15,24 @@ using UnityEngine;
 /// battle screen is a different *place* combat happens, not a different
 /// combat system.
 /// </summary>
+public readonly struct BattleResultSummary
+{
+    public readonly int DamageDealt;
+    public readonly int DamageTaken;
+    public readonly int XPEarned;
+    public readonly int GoldEarned;
+    public readonly IReadOnlyList<EquippableItem> ItemsDropped;
+
+    public BattleResultSummary(int damageDealt, int damageTaken, int xpEarned, int goldEarned, IReadOnlyList<EquippableItem> itemsDropped)
+    {
+        DamageDealt = damageDealt;
+        DamageTaken = damageTaken;
+        XPEarned = xpEarned;
+        GoldEarned = goldEarned;
+        ItemsDropped = itemsDropped;
+    }
+}
+
 public class BattleManager : MonoBehaviour
 {
     public static BattleManager Instance { get; private set; }
@@ -29,7 +48,23 @@ public class BattleManager : MonoBehaviour
 
     private PlayerController player;
     private EnemyController enemy;
+    private PlayerProgression progression;
     private bool startedOnPlayerTurn;
+
+    // Set the instant either side dies - distinct from IsActive, which now
+    // stays true through the victory/level-up outro screens (so the floor
+    // stays frozen), while this stops turn logic (OnPlayerAttackPressed/
+    // RunEnemyTurn) immediately so nothing keeps swinging at a dead entity.
+    private bool fightOver;
+
+    // Accumulated for the victory screen - reset in StartBattle, read in
+    // HandleVictory before anything gets torn down.
+    private int playerDamageDealt;
+    private int playerDamageTaken;
+    private int xpEarned;
+    private int goldEarned;
+    private readonly List<EquippableItem> itemsDropped = new List<EquippableItem>();
+    private int? leveledUpToLevel;
 
     private void Awake()
     {
@@ -76,6 +111,14 @@ public class BattleManager : MonoBehaviour
         this.player = player;
         this.enemy = enemy;
         IsActive = true;
+        fightOver = false;
+
+        playerDamageDealt = 0;
+        playerDamageTaken = 0;
+        xpEarned = 0;
+        goldEarned = 0;
+        itemsDropped.Clear();
+        leveledUpToLevel = null;
 
         // An enemy can start a battle during the enemy phase. Ending the *player's*
         // turn afterwards would then run a second enemy phase, so remember whose
@@ -85,6 +128,14 @@ public class BattleManager : MonoBehaviour
 
         player.OnDeath += HandleAnyDeath;
         enemy.OnDeath += HandleAnyDeath;
+        player.OnAttackResolved += HandlePlayerAttackResolved;
+        enemy.OnAttackResolved += HandleEnemyAttackResolved;
+        enemy.OnXPGranted += HandleXPGranted;
+        enemy.OnGoldGranted += HandleGoldGranted;
+        enemy.OnLootDropped += HandleLootDropped;
+
+        progression = player.GetComponent<PlayerProgression>();
+        if (progression != null) progression.OnLevelUp += HandleLevelUp;
 
         screenUI?.Show(player, enemy, OnPlayerAttackPressed);
 
@@ -108,14 +159,14 @@ public class BattleManager : MonoBehaviour
 
     private void OnPlayerAttackPressed()
     {
-        if (!IsActive) return;
+        if (!IsActive || fightOver) return;
 
         screenUI?.SetTurn(isPlayerTurn: false);
         player.Attack(enemy);
 
-        // A death triggers HandleAnyDeath -> EndBattle synchronously (Entity.OnDeath
-        // fires before Attack returns), so IsActive is already false here if so.
-        if (!IsActive) return;
+        // A death triggers HandleAnyDeath synchronously (Entity.OnDeath fires
+        // before Attack returns), so fightOver is already true here if so.
+        if (fightOver) return;
 
         StartCoroutine(RunEnemyTurn(isOpeningMove: false));
     }
@@ -125,46 +176,115 @@ public class BattleManager : MonoBehaviour
         screenUI?.SetInputEnabled(false);
         yield return new WaitForSeconds(enemyTurnDelaySeconds);
 
-        if (IsActive)
+        if (!fightOver)
         {
             enemy.Attack(player);
         }
 
-        if (IsActive)
+        if (!fightOver)
         {
             screenUI?.SetTurn(isPlayerTurn: true);
             screenUI?.SetInputEnabled(true);
         }
     }
 
-    private void HandleAnyDeath(Entity deadEntity)
+    private void HandlePlayerAttackResolved(Entity attacker, Entity defender, CombatResult result) => playerDamageDealt += result.Damage;
+    private void HandleEnemyAttackResolved(Entity attacker, Entity defender, CombatResult result) => playerDamageTaken += result.Damage;
+    private void HandleXPGranted(int amount) => xpEarned = amount;
+    private void HandleGoldGranted(int amount) => goldEarned = amount;
+
+    private void HandleLootDropped(ItemPickup pickup)
     {
-        EndBattle();
+        if (pickup?.PendingItem != null) itemsDropped.Add(pickup.PendingItem);
     }
 
-    private void EndBattle()
-    {
-        if (!IsActive) return;
-        IsActive = false;
+    private void HandleLevelUp(int newLevel) => leveledUpToLevel = newLevel;
 
+    private void HandleAnyDeath(Entity deadEntity)
+    {
+        if (fightOver) return;
+        fightOver = true;
         StopAllCoroutines();
 
-        if (player != null) player.OnDeath -= HandleAnyDeath;
-        if (enemy != null) enemy.OnDeath -= HandleAnyDeath;
+        if (deadEntity == enemy) HandleVictory();
+        else HandlePlayerDeath();
+    }
 
+    /// <summary>
+    /// Enemy died: show the victory screen (and, if this kill leveled the
+    /// player up, the level-up screen after it) before the floor is allowed
+    /// to resume. IsActive deliberately stays true through both screens -
+    /// GameManager's floor-advance wait and the player/enemy turn-skip
+    /// checks all key off it, so the dungeon stays frozen exactly as long as
+    /// an outro screen is on top of it.
+    /// </summary>
+    private void HandleVictory()
+    {
         screenUI?.Hide();
 
-        bool playerAlive = player != null && !player.IsDead;
+        var summary = new BattleResultSummary(playerDamageDealt, playerDamageTaken, xpEarned, goldEarned, itemsDropped);
+        VictoryScreenUI.Instance.Show(summary, AfterVictoryContinue);
+    }
+
+    private void AfterVictoryContinue()
+    {
+        if (leveledUpToLevel.HasValue)
+        {
+            LevelUpUI.Instance.Show(leveledUpToLevel.Value, FinishVictorySequence);
+        }
+        else
+        {
+            FinishVictorySequence();
+        }
+    }
+
+    private void FinishVictorySequence()
+    {
+        IsActive = false;
+        UnsubscribeBattleEvents();
+
         player = null;
         enemy = null;
+        progression = null;
 
         // Let the rest of the floor react now that the fight's over - same as
-        // any other player action ending its turn. Skipped on a player death
-        // (GameOverUI takes over), and skipped when an enemy started the fight
-        // during its own phase, since that phase will end on its own.
-        if (playerAlive && startedOnPlayerTurn && TurnManager.Instance != null)
+        // any other player action ending its turn. Skipped when an enemy started
+        // the fight during its own phase, since that phase will end on its own.
+        if (startedOnPlayerTurn && TurnManager.Instance != null)
         {
             TurnManager.Instance.EndPlayerTurn();
         }
+    }
+
+    /// <summary>Player died: no outro screen - GameOverUI takes over independently
+    /// via the player's own OnDeath, so this only needs to tear the battle down.</summary>
+    private void HandlePlayerDeath()
+    {
+        IsActive = false;
+        UnsubscribeBattleEvents();
+
+        screenUI?.Hide();
+
+        player = null;
+        enemy = null;
+        progression = null;
+    }
+
+    private void UnsubscribeBattleEvents()
+    {
+        if (player != null)
+        {
+            player.OnDeath -= HandleAnyDeath;
+            player.OnAttackResolved -= HandlePlayerAttackResolved;
+        }
+        if (enemy != null)
+        {
+            enemy.OnDeath -= HandleAnyDeath;
+            enemy.OnAttackResolved -= HandleEnemyAttackResolved;
+            enemy.OnXPGranted -= HandleXPGranted;
+            enemy.OnGoldGranted -= HandleGoldGranted;
+            enemy.OnLootDropped -= HandleLootDropped;
+        }
+        if (progression != null) progression.OnLevelUp -= HandleLevelUp;
     }
 }
