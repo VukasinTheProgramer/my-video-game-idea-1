@@ -34,6 +34,16 @@ public class VictoryScreenUI : MonoBehaviour
     private Button continueButton;
     private Action pendingContinue;
 
+    // Input.GetKeyDown stays true for the WHOLE frame, for every script that polls
+    // it - so the same Space press that landed the killing blow (read by
+    // BattleScreenUI.Update) would also be read by this screen's Update later in
+    // that same frame and dismiss it instantly. That's why this only ever appeared
+    // on the very first kill: Instance builds the GameObject mid-frame during the
+    // first HandleVictory, and a MonoBehaviour created mid-frame gets no Update
+    // until the next one. Every later fight reused the existing object and got
+    // eaten immediately.
+    private int shownOnFrame = -1;
+
     private void Awake()
     {
         root = ModalScreenUI.BuildOverlay("VictoryScreen", out titleText, out bodyText, out continueButton);
@@ -44,9 +54,14 @@ public class VictoryScreenUI : MonoBehaviour
         root.gameObject.SetActive(false);
     }
 
+    /// <summary>False on the frame this was shown, so the keypress that opened it
+    /// can't also confirm it. See shownOnFrame.</summary>
+    private bool CanAcceptInput() =>
+        root != null && root.gameObject.activeSelf && Time.frameCount != shownOnFrame;
+
     private void Update()
     {
-        if (root == null || !root.gameObject.activeSelf) return;
+        if (!CanAcceptInput()) return;
         if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return))
         {
             HandleContinueClicked();
@@ -77,6 +92,7 @@ public class VictoryScreenUI : MonoBehaviour
         // sibling and paints over this on every show after the first. Same fix
         // ItemTooltipUI already uses for the same reason.
         root.transform.SetAsLastSibling();
+        shownOnFrame = Time.frameCount;
         root.gameObject.SetActive(true);
     }
 

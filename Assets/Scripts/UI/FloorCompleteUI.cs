@@ -32,6 +32,11 @@ public class FloorCompleteUI : MonoBehaviour
     private Button continueButton;
     private Action pendingContinue;
 
+    // Input.GetKeyDown is true for the whole frame across every script, so the
+    // Space press that confirmed the last fight's outro screen must not also
+    // confirm this one. See VictoryScreenUI.shownOnFrame for the full explanation.
+    private int shownOnFrame = -1;
+
     private void Awake()
     {
         root = ModalScreenUI.BuildOverlay("FloorCompleteScreen", out titleText, out bodyText, out continueButton);
@@ -41,9 +46,14 @@ public class FloorCompleteUI : MonoBehaviour
         root.gameObject.SetActive(false);
     }
 
+    /// <summary>False on the frame this was shown, so the keypress that opened it
+    /// can't also confirm it. See shownOnFrame.</summary>
+    private bool CanAcceptInput() =>
+        root != null && root.gameObject.activeSelf && Time.frameCount != shownOnFrame;
+
     private void Update()
     {
-        if (root == null || !root.gameObject.activeSelf) return;
+        if (!CanAcceptInput()) return;
         if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return))
         {
             HandleContinueClicked();
@@ -68,6 +78,7 @@ public class FloorCompleteUI : MonoBehaviour
         // later-added Canvas child can't end up painting over this. Same fix
         // ItemTooltipUI uses.
         root.transform.SetAsLastSibling();
+        shownOnFrame = Time.frameCount;
         root.gameObject.SetActive(true);
     }
 

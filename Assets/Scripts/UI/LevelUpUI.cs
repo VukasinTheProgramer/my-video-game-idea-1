@@ -33,6 +33,12 @@ public class LevelUpUI : MonoBehaviour
     private Button continueButton;
     private Action pendingContinue;
 
+    // Input.GetKeyDown is true for the whole frame across every script, and this
+    // screen is chained straight off VictoryScreenUI's Continue - so one Space
+    // press would confirm Victory and then immediately confirm this too, in the
+    // same frame. See VictoryScreenUI.shownOnFrame for the full explanation.
+    private int shownOnFrame = -1;
+
     private void Awake()
     {
         root = ModalScreenUI.BuildOverlay("LevelUpScreen", out titleText, out bodyText, out continueButton);
@@ -43,9 +49,14 @@ public class LevelUpUI : MonoBehaviour
         root.gameObject.SetActive(false);
     }
 
+    /// <summary>False on the frame this was shown, so the keypress that opened it
+    /// can't also confirm it. See shownOnFrame.</summary>
+    private bool CanAcceptInput() =>
+        root != null && root.gameObject.activeSelf && Time.frameCount != shownOnFrame;
+
     private void Update()
     {
-        if (root == null || !root.gameObject.activeSelf) return;
+        if (!CanAcceptInput()) return;
         if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return))
         {
             HandleContinueClicked();
@@ -69,6 +80,7 @@ public class LevelUpUI : MonoBehaviour
         // later-added Canvas child (equipment panel, VictoryScreenUI's own root,
         // etc) can't end up painting over this. Same fix ItemTooltipUI uses.
         root.transform.SetAsLastSibling();
+        shownOnFrame = Time.frameCount;
         root.gameObject.SetActive(true);
     }
 
