@@ -64,6 +64,11 @@ public class LevelUpUI : MonoBehaviour
         bodyText.text = $"You reached Level {newLevel}!\n\nOpen the character panel to spend your new stat point.";
 
         if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+
+        // Built once in Awake and never moved since - re-raise on every show so a
+        // later-added Canvas child (equipment panel, VictoryScreenUI's own root,
+        // etc) can't end up painting over this. Same fix ItemTooltipUI uses.
+        root.transform.SetAsLastSibling();
         root.gameObject.SetActive(true);
     }
 

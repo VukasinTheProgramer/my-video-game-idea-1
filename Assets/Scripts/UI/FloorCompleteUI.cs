@@ -63,6 +63,11 @@ public class FloorCompleteUI : MonoBehaviour
         bodyText.text = "Every enemy on this floor is defeated.";
 
         if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+
+        // Built once in Awake and never moved since - re-raise on every show so a
+        // later-added Canvas child can't end up painting over this. Same fix
+        // ItemTooltipUI uses.
+        root.transform.SetAsLastSibling();
         root.gameObject.SetActive(true);
     }
 

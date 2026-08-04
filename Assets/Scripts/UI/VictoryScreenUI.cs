@@ -71,6 +71,12 @@ public class VictoryScreenUI : MonoBehaviour
         // press here means only "continue" (same reasoning as BattleScreenUI.Show).
         if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
 
+        // Built once in Awake and never moved since - without this, anything added
+        // to the Canvas after that first build (equipment panel, its item tooltip,
+        // even LevelUpUI/FloorCompleteUI on their own first use) ends up a later
+        // sibling and paints over this on every show after the first. Same fix
+        // ItemTooltipUI already uses for the same reason.
+        root.transform.SetAsLastSibling();
         root.gameObject.SetActive(true);
     }
 
