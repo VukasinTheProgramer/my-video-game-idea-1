@@ -26,6 +26,32 @@ action per turn (move via `PlayerController.TryAct`), then every registered
 enemy (`EnemyController`) takes a turn. Combat itself happens on a separate
 **battle screen**, not inline on the grid (see below).
 
+## Enemy AI — leashed wander/chase
+
+Enemies don't roam the whole floor. Each is leashed to its own spawn cell
+(`spawnCell`, set once in `SpawnAt`) and never takes a step outside a flat
+square around it (`leashRadius`, default 2 — Chebyshev distance, i.e.
+`|dx| <= radius && |dy| <= radius`, not walkable-path distance or the
+enemy's actual room polygon).
+
+Per turn (`EnemyController.TakeTurn`):
+1. Engage/attack check runs first regardless of the leash — an enemy that's
+   already adjacent still fights back even at the edge of its box.
+2. If the player is within `aggroRange` (default 5, Manhattan distance): step
+   one cell along the BFS-shortest path toward the player
+   (`Pathfinder.FindNextStep`), **unless** that step would leave the leash
+   box, in which case the enemy holds its ground instead of crossing out.
+3. Otherwise (player far away): `wiggleChance` (default 30%) per turn to take
+   one random cardinal step, staying inside the leash box. Mostly stands
+   still — this is idle flavor, not a search.
+
+Simplification, named on purpose: the leash box is flat-radius, not the
+enemy's actual room shape — `DungeonGenerator` doesn't hand `EnemyController`
+a room rect today, and spawn cells already land well inside a room via
+`RandomCellInRoom`, so a radius-2 box rarely pokes through a wall in
+practice. Upgrade path if that ever matters: pass the spawning room's
+`RectInt` into `SpawnAt` and clamp to that instead of a flat square.
+
 ## Stat system
 
 `Stats` (serializable class on `Entity`): `attack`, `agility`, `magic`,

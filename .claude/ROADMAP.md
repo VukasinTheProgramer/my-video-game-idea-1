@@ -189,12 +189,13 @@ next build item.
 
 ## Enemy archetypes
 
-Only one enemy behavior exists today (chase + melee, i.e. "Brute"). Add an
+Only one enemy behavior exists today (leashed wander/chase + melee, i.e.
+"Brute" — see `IMPLEMENTED.md` → "Enemy AI — leashed wander/chase"). Add an
 `EnemyArchetype` enum/ScriptableObject that changes `EnemyController.TakeTurn`:
 
 | Archetype | Behavior |
 |-----------|----------|
-| Brute | Current behavior — chase + melee, high HP/ATK, low AGI |
+| Brute | Current behavior — leashed wander/chase + melee, high HP/ATK, low AGI |
 | Skirmisher | Melee, avoids being surrounded, higher AGI |
 | Ranged | Stays 2-4 cells away, attacks in lines, backs off if approached |
 | Support | Heals/buffs nearby enemies, priority target |

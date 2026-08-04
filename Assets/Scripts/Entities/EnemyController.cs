@@ -3,13 +3,34 @@ using UnityEngine;
 
 /// <summary>
 /// Enemy AI: if the player is within BattleManager's engage range, open the
-/// battle screen; otherwise take one step along the BFS-shortest path toward
-/// the player (see Pathfinder).
+/// battle screen. Otherwise the enemy is leashed to its spawn point rather
+/// than chasing across the whole floor - it wiggles occasionally within
+/// leashRadius when the player's far away, and closes in via the BFS-shortest
+/// path (Pathfinder) only once the player is within aggroRange, but never
+/// takes a step that would leave the leash box.
+///
+/// The leash is a flat square around the spawn cell (Chebyshev distance),
+/// not the enemy's actual room polygon - DungeonGenerator doesn't hand
+/// EnemyController a room rect today, and spawn cells already land well
+/// inside a room via RandomCellInRoom, so a small flat radius rarely pokes
+/// through a wall. Upgrade path if that ever matters: pass the spawning
+/// room's RectInt into SpawnAt and clamp to that instead.
 /// </summary>
 [RequireComponent(typeof(Entity))]
 public class EnemyController : Entity
 {
     [SerializeField] private LootTable lootTable;
+
+    [Header("Leash & wander")]
+    [Tooltip("How far from its spawn cell (Chebyshev distance - a flat square, not a walkable-distance radius) this enemy will ever move.")]
+    [SerializeField] private int leashRadius = 2;
+    [Tooltip("Player must be within this many cells (Manhattan distance) before the enemy starts closing in. Beyond that, it only wiggles.")]
+    [SerializeField] private int aggroRange = 5;
+    [Tooltip("Chance per turn to take one random step while idle (player out of aggroRange). 0 = never wanders, just stands still.")]
+    [Range(0f, 1f)] [SerializeField] private float wiggleChance = 0.3f;
+
+    private Vector2Int spawnCell;
+
     [Tooltip("Flat XP granted to the player on a kill (IMPLEMENTED.md -> \"Leveling & stat points\") - tune per enemy type/floor tier directly, no formula.")]
     [SerializeField] private int xpReward = 10;
 
@@ -35,6 +56,12 @@ public class EnemyController : Entity
     public event Action<int> OnGoldGranted;
 
     private PlayerController player;
+
+    public override void SpawnAt(Vector2Int cell)
+    {
+        base.SpawnAt(cell);
+        spawnCell = cell;
+    }
 
     private void Start()
     {
@@ -67,8 +94,9 @@ public class EnemyController : Entity
         // without spending a move.
         if (TryEngageOrFallbackAttack()) return;
 
-        Vector2Int? nextCell = Pathfinder.FindNextStep(Cell, player.Cell);
-        if (nextCell == null) return; // no walkable path this turn, just wait
+        bool playerNearby = GridUtils.WithinRange(Cell, player.Cell, aggroRange);
+        Vector2Int? nextCell = playerNearby ? GetLeashedStepToward(player.Cell) : GetWiggleStep();
+        if (nextCell == null) return; // no move this turn - wait, either by design (idle) or leash-blocked
 
         if (DungeonGrid.CanMoveTo(nextCell.Value))
         {
@@ -80,6 +108,38 @@ public class EnemyController : Entity
             // the enemy two actions where the player only ever gets one.
             TryEngage();
         }
+    }
+
+    private bool IsWithinLeash(Vector2Int cell)
+    {
+        return Mathf.Abs(cell.x - spawnCell.x) <= leashRadius && Mathf.Abs(cell.y - spawnCell.y) <= leashRadius;
+    }
+
+    /// <summary>One step along the shortest path toward goal, or null if that step
+    /// would leave the leash box - the enemy holds its ground at the boundary
+    /// rather than stepping out, even mid-chase.</summary>
+    private Vector2Int? GetLeashedStepToward(Vector2Int goal)
+    {
+        Vector2Int? step = Pathfinder.FindNextStep(Cell, goal);
+        if (step == null || !IsWithinLeash(step.Value)) return null;
+        return step;
+    }
+
+    /// <summary>Rolls wiggleChance, then tries the 4 cardinal directions starting
+    /// from a random one, taking the first that's walkable, unoccupied, and still
+    /// inside the leash box. Null most turns by design - this is idle flavor, not
+    /// a search for somewhere to go.</summary>
+    private Vector2Int? GetWiggleStep()
+    {
+        if (UnityEngine.Random.value > wiggleChance) return null;
+
+        int start = UnityEngine.Random.Range(0, GridUtils.CardinalDirections.Length);
+        for (int i = 0; i < GridUtils.CardinalDirections.Length; i++)
+        {
+            Vector2Int candidate = Cell + GridUtils.CardinalDirections[(start + i) % GridUtils.CardinalDirections.Length];
+            if (IsWithinLeash(candidate) && DungeonGrid.CanMoveTo(candidate)) return candidate;
+        }
+        return null;
     }
 
     /// <summary>Opens the battle screen if the player's within range (IMPLEMENTED.md -> "Battle screen (encounter flow)"),
