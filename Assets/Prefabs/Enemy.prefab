@@ -115,4 +115,5 @@ MonoBehaviour:
   moveAnimSeconds: 0.12
   hitFlashColor: {r: 1, g: 0.35, b: 0.35, a: 1}
   hitFlashSeconds: 0.08
-  lootTable: {fileID: 0}
+  lootTable: {fileID: 11400000, guid: 40d80489c1e9840719c6293eafefda41, type: 2}
+  xpReward: 10

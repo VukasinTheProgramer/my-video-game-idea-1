@@ -166,6 +166,21 @@ adjacent-attack if no `BattleManager` exists in the scene.
   follow position each frame (avoids two systems fighting over the
   camera's transform). Triggered on crit via `Entity.Attack`.
 
+## Enemy loot
+
+`EnemyController.Die()` rolls `LootTable` (ScriptableObject, weighted drops,
+`dropChance` gate before the item pick) and spawns an `EquipmentDropPickup`
+on the enemy's cell; `GameManager` tracks spawned drops for floor-transition
+cleanup. `LootTable` returns the shared ScriptableObject **template**, so two
+drops of one entry are the *same reference* — this is why `Equipment.Equip`
+early-returns on an already-worn item.
+
+One table exists, `Assets/Equipment/LootTables/DefaultLootTable.asset`
+(30% `dropChance`, all 6 current `EquippableItem`s, Common weighted 3x
+Rare), assigned to `Enemy.prefab` — every enemy currently rolls against it,
+no per-enemy-type variation yet. Per-drop stat rolls (rarity/floor scaling
+an item's actual numbers) are `ROADMAP.md` → "Item generation", not this.
+
 ## Key files
 
 | Area | File |
@@ -176,7 +191,7 @@ adjacent-attack if no `BattleManager` exists in the scene.
 | Player / enemy | `Assets/Scripts/Entities/PlayerController.cs`, `Assets/Scripts/Entities/EnemyController.cs` |
 | Equipment | `Assets/Scripts/Equipment/Equipment.cs`, `EquippableItem.cs`, `EquipmentSlot.cs`, `WeaponType.cs`, `Rarity.cs`, `RarityVisuals.cs` |
 | Bag | `Assets/Scripts/Equipment/Inventory.cs` |
-| Items on the floor | `Assets/Scripts/Items/ItemPickup.cs`, `HealthPotionPickup.cs`, `EquipmentDropPickup.cs` |
+| Items on the floor | `Assets/Scripts/Items/ItemPickup.cs`, `HealthPotionPickup.cs`, `EquipmentDropPickup.cs`, `LootTable.cs` |
 | Battle screen | `Assets/Scripts/Managers/BattleManager.cs`, `Assets/Scripts/UI/BattleScreenUI.cs` |
 | Equipment/bag UI | `Assets/Scripts/UI/EquipmentPanelUI.cs`, `ItemSlotUI.cs`, `ItemTooltipUI.cs` |
 | Feedback | `Assets/Scripts/UI/DamageNumberSpawner.cs`, `DamageNumberMotion.cs`, `UI/CameraShake.cs`, `Core/CameraFollow.cs` |

@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 048f214df5a3e4b3d9a6e27acf97679e, type: 3}
+  m_Name: DefaultLootTable
+  m_EditorClassIdentifier: 
+  dropChance: 0.3
+  entries:
+  - item: {fileID: 11400000, guid: 80c61ec32ba1f4c00bb041c3ff9315a6, type: 2}
+    weight: 3
+  - item: {fileID: 11400000, guid: 63be912296fc942918c8049b59eb6de5, type: 2}
+    weight: 3
+  - item: {fileID: 11400000, guid: e544773443c0745e4b9104594f8676df, type: 2}
+    weight: 3
+  - item: {fileID: 11400000, guid: 72401e5e731e74e2cba0553f6cace9fa, type: 2}
+    weight: 3
+  - item: {fileID: 11400000, guid: 5147d4f3f9a7040bb8dcd4a7cae1a419, type: 2}
+    weight: 1
+  - item: {fileID: 11400000, guid: c08c907a5e39c473cb2ffebc552cb9a2, type: 2}
+    weight: 1

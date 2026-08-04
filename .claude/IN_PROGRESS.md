@@ -23,7 +23,7 @@ Last updated: 2026-08-04. Branch: `testing`.
 
 ---
 
-## 1. Two dead systems remain — one fixed
+## 1. One dead system remains — two fixed
 
 All **serialized-data only**, no C# to write. This is `CLAUDE.md` §0's bug
 class, currently live in the repo. Verified 2026-08-04 by GUID grep against
@@ -31,19 +31,20 @@ class, currently live in the repo. Verified 2026-08-04 by GUID grep against
 
 | What's dead | Why | Fix |
 |---|---|---|
-| ~~XP / levels / stat points~~ | Fixed 2026-08-04, see below. | — |
-| **Enemy gear drops** | No `LootTable` asset was ever authored; `Enemy.prefab` serializes `lootTable: {fileID: 0}`. | Author one `LootTable` asset, assign it on the prefab. |
+| ~~XP / levels / stat points~~ | Fixed 2026-08-04, see 1a. | — |
+| ~~Enemy gear drops~~ | Fixed 2026-08-04, see 1b. | — |
 | **5 stat-only equipment slots** | `Main.unity` wires 10 `slotUIs`/`slotLabels`; `EquipmentPanelUI.SlotOrder` now has 15. Length guards stop the throw, so Belt/Ring1/Ring2/Trinket1/Trinket2 just have no UI square. | Build 5 more slot UIs in the scene. |
 
-**Next action:** one throwaway headless script doing both remaining fixes
-(`CLAUDE.md` §1 loop — Editor must be closed first). Wire the private
-`[SerializeField]` arrays via `SerializedObject`, and log a sentinel per fix —
-separate greps, since a partial success here looks identical to a full one.
+**Next action:** one throwaway headless script building the 5 slot UIs and
+wiring them into `EquipmentPanelUI.slotUIs`/`slotLabels` (`CLAUDE.md` §1
+loop — Editor must be closed first).
 
-Now unresolved for real (not "harmless until wired" anymore): `Enemy.prefab`
-has **no `xpReward` key**, so it silently falls back to the C# default of 10
-for every enemy. Now that `PlayerProgression` is live, this is a live tuning
-gap — every enemy currently grants identical XP regardless of difficulty.
+Live tuning gap, not a wiring bug: `Enemy.prefab` has **no `xpReward` key**,
+so it silently falls back to the C# default of 10 for every enemy. Harmless
+while `PlayerProgression` was dead; now that it's live, every enemy grants
+identical XP regardless of difficulty. Same root cause noted again below for
+loot — enemies also have no per-type drop-table variation, everything rolls
+against the one shared `DefaultLootTable`.
 
 ### 1a. Leveling & stat points — FIXED 2026-08-04, moved to `IMPLEMENTED.md`
 
@@ -63,20 +64,26 @@ Checked and ruled out during this fix: `Stats.Level1Default()` (ATK 1, AGI 1,
 maxHp 101) is the plain pre-spend baseline, not a hidden pre-spent version of
 the 10 starting points — no double-grant risk.
 
-### 1b. Enemy loot — the drop path that never rolls
+### 1b. Enemy loot — FIXED 2026-08-04, moved to `IMPLEMENTED.md`
 
-Also moved out of `IMPLEMENTED.md`. `EnemyController.Die()` is written to roll
-`LootTable` (ScriptableObject, weighted drops) and spawn an
-`EquipmentDropPickup` on the enemy's cell, and `GameManager` does already
-track spawned drops for floor-transition cleanup. That half works.
+Authored `Assets/Equipment/LootTables/DefaultLootTable.asset` (30%
+`dropChance`, all 6 existing `EquippableItem`s — the 4 Common ones weighted
+3, the 2 Rare ones weighted 1) and assigned it to `Enemy.prefab.lootTable`,
+via a throwaway headless script (`Assets/Editor/WireLootTable.cs`, deleted
+after running).
 
-What's missing is data: **no `LootTable` asset was ever authored**, and
-`Enemy.prefab` serializes `lootTable: {fileID: 0}`. The roll is skipped.
+Verified live, not just in the YAML: a play-mode check
+(`Assets/Editor/VerifyLoot.cs`, also deleted after) read the wired
+`LootTable` off the actually-spawned enemy and rolled it 200 times — 59
+drops, ≈29.5%, matching the configured 30% within statistical noise — rather
+than asserting on a single roll, since a 30% table can legitimately miss on
+any one trial.
 
-When authoring the asset, know that `LootTable` returns the shared
-ScriptableObject **template** — two drops of one entry are the *same
-reference*, which is why `Equipment.Equip` early-returns on an already-worn
-item. Per-drop stat rolls are `ROADMAP.md` → "Item generation".
+Every enemy currently shares this one table — no per-enemy-type variation
+yet. `LootTable` returns the shared ScriptableObject **template**, so two
+drops of one entry are the *same reference*, which is why `Equipment.Equip`
+early-returns on an already-worn item. Per-drop stat rolls are `ROADMAP.md` →
+"Item generation".
 
 ## 2. Currency — designed, needs a decision before any code
 

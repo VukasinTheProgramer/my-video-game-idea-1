@@ -12,8 +12,9 @@ lives in three files under `.claude/`:
 | `.claude/IN_PROGRESS.md` | Written but not wired, found-but-unfixed bugs, decisions pending |
 | `.claude/ROADMAP.md` | Designed, no code |
 
-**Start a session by reading `.claude/IN_PROGRESS.md`.** It currently lists
-two systems that are fully written and never execute.
+**Start a session by reading `.claude/IN_PROGRESS.md`.** As of 2026-08-04 the
+two fully-dead systems it tracked (`PlayerProgression`, enemy loot) are both
+fixed; one lesser gap remains (5 equipment slots have no UI square yet).
 
 (All three replaced the old `COMBAT_DESIGN.md`, which mixed spec with status
 and marked non-functional things ✅. Citations below name section *titles*, not
@@ -300,10 +301,10 @@ list in `.claude/` is two copies that drift, and they already did: they
 disagreed about loot, which is how two entirely dead systems sat unnoticed
 through three code reviews.
 
-Read `.claude/IN_PROGRESS.md` first (what's broken or half-done, including
-three systems that are written and never execute), then
-`.claude/IMPLEMENTED.md` (what genuinely runs) and `.claude/ROADMAP.md`
-(what's only designed).
+Read `.claude/IN_PROGRESS.md` first (what's broken or half-done — including
+any systems that are fully written and never execute, this project's worst
+bug class), then `.claude/IMPLEMENTED.md` (what genuinely runs) and
+`.claude/ROADMAP.md` (what's only designed).
 
 Before trusting *any* "it's built" claim in those files, spend ten seconds on
 the §0 recipe:
