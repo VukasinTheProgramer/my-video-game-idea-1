@@ -4,8 +4,12 @@ Unity 2D top-down turn-based pixel dungeon crawler. Unity **6000.0.80f1**, macOS
 Reference game for combat feel: **Bit Heroes Quest**.
 
 Read this before touching anything. `IMPLEMENTED.md` is what actually ships
-today, `ROADMAP.md` is what's designed but unbuilt — this file is *how to work
-on the project without breaking it*.
+today, `ROADMAP.md` is what's designed but unbuilt, `.claude/IN_PROGRESS.md` is
+mid-flight work and open questions — this file is *how to work on the project
+without breaking it*.
+
+**Start a session by reading `.claude/IN_PROGRESS.md`.** It currently lists
+three systems that are fully written and never execute.
 
 (Both replaced the old `COMBAT_DESIGN.md`, which mixed the two and marked
 non-functional things ✅. Citations below point at section titles, not
