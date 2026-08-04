@@ -3,8 +3,13 @@
 Unity 2D top-down turn-based pixel dungeon crawler. Unity **6000.0.80f1**, macOS.
 Reference game for combat feel: **Bit Heroes Quest**.
 
-Read this before touching anything. `COMBAT_DESIGN.md` is the design spec —
-this file is *how to work on the project without breaking it*.
+Read this before touching anything. `IMPLEMENTED.md` is what actually ships
+today, `ROADMAP.md` is what's designed but unbuilt — this file is *how to work
+on the project without breaking it*.
+
+(Both replaced the old `COMBAT_DESIGN.md`, which mixed the two and marked
+non-functional things ✅. Citations below point at section titles, not
+numbers, so they survive the next reshuffle.)
 
 ---
 
@@ -150,7 +155,7 @@ formula; `Entity.Attack` is its only caller. There are two *entry points*:
    `BattleManager` is in the scene.
 
 **Do not "consolidate" these by deleting the fallback.** It is by design
-(`COMBAT_DESIGN.md` §0).
+(`IMPLEMENTED.md` → "Battle screen (encounter flow)").
 
 ### Rendering: layered equipment
 
@@ -220,7 +225,8 @@ direction comes out mirrored.
   soft-lock. `BattleManager` with a null `screenUI` used to set `IsActive = true`
   with no way to attack — freezing player input and every enemy, forever, with an
   empty console. Now it errors and lets the inline fallback carry the game.
-- **Never silently discard player property.** `COMBAT_DESIGN.md` §2½: an item is
+- **Never silently discard player property.** `IMPLEMENTED.md` → "Bag /
+  Inventory": an item is
   never destroyed. `PickUp` returns `bool`; the caller destroys the pickup **only**
   on `true`, otherwise it goes back on the grid. Same reasoning made
   `DungeonGrid.PlaceItem` return `bool` instead of overwriting an occupied cell.
@@ -242,8 +248,9 @@ direction comes out mirrored.
 
 **Fix bugs. Surface design decisions — don't silently redesign.**
 
-Live example, deliberately **not** changed: `COMBAT_DESIGN.md` §1's flat
-`max(1, raw - DEF)` combined with §1a's baseline DEF 5 and ATK 1 means enemy hits
+Live example, deliberately **not** changed: the flat `max(1, raw - DEF)` in
+`IMPLEMENTED.md` → "Stat system", combined with that same section's Level 1
+baseline of DEF 5 and ATK 1, means enemy hits
 and enemy **crits** both deal exactly 1 damage, while the UI shows a yellow crit
 number. The code implements the doc faithfully — the *doc* produces the
 degenerate result. Changing the formula would be redesigning combat feel. It was
@@ -251,8 +258,8 @@ reported with two options for the user to choose from instead.
 
 When the doc and the code disagree, say so explicitly and state which you think
 is wrong. Several such divergences were found; in some the code was right
-(`Hammer` should parry — §1's list predates §2a) and in others the doc was
-(`WeaponType.None` must **not** parry).
+(`Hammer` should parry — the old spec's melee list predated its own handedness
+section) and in others the doc was (`WeaponType.None` must **not** parry).
 
 ---
 
@@ -260,8 +267,10 @@ is wrong. Several such divergences were found; in some the code was right
 
 Match the surrounding code — it has a consistent voice worth preserving.
 
-- Comments explain **why**, and cite the spec section (`COMBAT_DESIGN.md §2a`).
-  Comments that merely restate the code are noise.
+- Comments explain **why**, and cite the spec by **section title, not number**
+  (`ROADMAP.md → "Weapon handedness & shields"`) — the old numbered citations
+  all died with `COMBAT_DESIGN.md`. Comments that merely restate the code are
+  noise.
 - When taking a deliberate shortcut, say so and name the upgrade path. Existing
   examples: rarity "motion outline" is a colour pulse because a real marching-ants
   border needs a custom shader; the hit flash tints red because
@@ -278,29 +287,44 @@ Match the surrounding code — it has a consistent voice worth preserving.
 
 ## 7. Current state
 
-**Working:** floor generation + progression, BFS pathfinding, turn loop, 10-slot
-layered equipment with direction-aware rendering, stat-driven combat
-(crit/dodge/parry/life steal), 1v1 Bit Heroes-style battle screen, character panel
-(stats + equipment + bag, right-click for item tooltip with Equip/Unequip),
-damage numbers, hit flash, screen shake on crit, floor scaling, game over.
+Feature-by-feature status lives in **`IMPLEMENTED.md`** (shipped) and
+**`ROADMAP.md`** (planned). Don't duplicate that list here — it drifts. Two
+copies already disagreed, which is how the dead systems below went unnoticed.
+
+**Authored but NOT wired — the code exists, runs never.** This is §0's bug
+class, and it is currently live in two systems:
+
+- **`PlayerProgression` is not on `Player.prefab`.** Its four components are
+  `PlayerController`, `DirectionalSpriteAnimator`, `Equipment`, `Inventory`.
+  Nothing `AddComponent`s it, and every caller null-guards
+  (`progression?.AddXP(xpReward)`, `EquipmentPanelUI`'s `GetComponent`), so
+  **XP, levels and stat points silently do nothing** — no error, no warning.
+  `Assets/Scripts/Core/PlayerProgression.cs` is fully written and unreachable.
+- **No `LootTable` asset exists** (only the script), and `Enemy.prefab` has
+  `lootTable: {fileID: 0}`. `EnemyController.Die` never drops gear.
+
+Verify with the §0 recipe before trusting any "it's built" claim:
+
+```bash
+grep -h '^guid:' Assets/Scripts/Core/PlayerProgression.cs.meta
+grep -c "<that-guid>" Assets/Scenes/Main.unity Assets/Prefabs/Player.prefab
+```
 
 **Known gaps — do not assume these work:**
 
-- **No `LootTable` asset exists** (only the script), so `EnemyController.Die`
-  never drops gear. `COMBAT_DESIGN.md` §7 step 3 is marked ✅ but is
-  non-functional.
+- **`Main.unity` wires only 10 `slotUIs`** but `EquipmentPanelUI.SlotOrder` now
+  has 15. Length guards keep it from throwing, so Belt/Ring1/Ring2/Trinket1/
+  Trinket2 just never render.
 - **Damage numbers are invisible during battles** — world-space `TextMesh` at
   dungeon positions, behind a 0.97-alpha overlay canvas.
 - Battle turns are **manual** (Attack button / Space), not auto-resolving.
 - Strictly **1v1**. No party, no multi-enemy encounters, no fleeing.
-- §2c item scaling by floor/rarity does not exist — `LootTable` returns the shared
-  ScriptableObject **template**, so two drops of one entry are the *same
-  reference*. (This is why `Equipment.Equip` must early-return when re-equipping
-  an already-worn item.)
-- Not built: weapon-driven attack patterns (§4), enemy archetypes beyond Brute
-  (§3), boss telegraphs, companion (§5), pixel-perfect camera, audio.
-- §1a's skill points (`attackPoints`/`unspentSkillPoints = 10`) don't exist;
-  `Stats.Level1Default()` hardcodes the pre-spend baseline.
+- Item scaling by floor/rarity does not exist (`ROADMAP.md` → "Item
+  generation") — `LootTable` returns the shared ScriptableObject **template**,
+  so two drops of one entry are the *same reference*. (This is why
+  `Equipment.Equip` must early-return when re-equipping an already-worn item.)
+- Not built: weapon-driven attack patterns, enemy archetypes beyond Brute,
+  boss telegraphs, companion, pixel-perfect camera, audio — all in `ROADMAP.md`.
 - **`README.md` is badly stale** — it claims no Unity project exists yet and
-  describes AI that was replaced by BFS. Treat this file and `COMBAT_DESIGN.md`
-  as authoritative.
+  describes AI that was replaced by BFS. Treat this file, `IMPLEMENTED.md` and
+  `ROADMAP.md` as authoritative.

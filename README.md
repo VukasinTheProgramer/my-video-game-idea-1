@@ -10,7 +10,8 @@ encounter screen.
 
 - **Engine:** Unity **6000.0.80f1** (Unity 6 LTS)
 - **Scene:** `Assets/Scenes/Main.unity` (the only scene)
-- **Design spec:** [`COMBAT_DESIGN.md`](COMBAT_DESIGN.md)
+- **What's built:** [`IMPLEMENTED.md`](IMPLEMENTED.md)
+- **What's planned:** [`ROADMAP.md`](ROADMAP.md)
 - **Contributor / AI-assistant working notes:** [`CLAUDE.md`](CLAUDE.md)
 
 ---

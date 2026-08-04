@@ -1,9 +1,18 @@
 # Implemented
 
-What's actually built and working in the game right now, verified against
-the current code (not just designed/discussed). Reference game for combat
-feel: **Bit Heroes Quest** (Kongregate). See `ROADMAP.md` for anything
-designed but not yet built.
+What's built in the game right now. Reference game for combat feel: **Bit
+Heroes Quest** (Kongregate). See `ROADMAP.md` for anything designed but not
+yet built.
+
+"Built" means the **C# exists** — it does *not* prove the scene or prefabs
+reference it (`CLAUDE.md` §0: that's this project's worst bug class). Sections
+carrying **⚠️** describe finished code that never runs because serialized data
+doesn't point at it. Verify anything load-bearing before relying on it:
+
+```bash
+grep -h '^guid:' Assets/Scripts/Path/Thing.cs.meta
+grep -c "<that-guid>" Assets/Scenes/Main.unity Assets/Prefabs/Player.prefab
+```
 
 ---
 
@@ -46,9 +55,22 @@ Level 1 baseline (before gear): Max HP 101 (100 flat + 1 Health point), ATK
 1, AGI 1, MAG 0 (gear-only), DEF 5, MDEF 5 (flat innate toughness, everything
 past that from gear).
 
-## Leveling & stat points
+## Leveling & stat points — ⚠️ WRITTEN BUT NOT WIRED, DOES NOTHING
 
-`PlayerProgression` component (sits on the player next to `PlayerController`):
+**This section describes code that never executes.** `PlayerProgression` is
+**not a component on `Player.prefab`** (which carries only `PlayerController`,
+`DirectionalSpriteAnimator`, `Equipment`, `Inventory`), and nothing adds it at
+runtime. Every caller fetches it defensively — `progression?.AddXP(xpReward)`
+in `EnemyController.Die`, `player.GetComponent<PlayerProgression>()` in
+`EquipmentPanelUI` — so XP is never granted, no level-up ever fires, and no
+stat point is ever spendable. Silently: no error, no warning.
+
+Adding the component to the prefab is the whole fix; the logic below is
+complete and correct. Kept in this file rather than `ROADMAP.md` because the
+code is written, not planned.
+
+`PlayerProgression` component (intended to sit on the player next to
+`PlayerController`):
 
 - **XP**: flat amount per enemy (`EnemyController.xpReward`, default 10,
   hand-tuned per enemy like `lootTable`), granted to the killer on `Die()`.
@@ -75,6 +97,11 @@ via `Equipment`, kept in sync with the base body's animation frame) plus
 never render a visible layer, they just contribute to `TotalBonusStats`).
 `EquipmentLayerOrder.Fixed` has a sorting-order entry for every slot,
 including a shared `StatOnlyOrder` constant for the 5 stat-only ones.
+
+⚠️ `Main.unity` still wires only **10** `slotUIs`/`slotLabels`. The length
+guards in `EquipmentPanelUI.Refresh` mean this doesn't throw — the last five
+(Belt, Ring1, Ring2, Trinket1, Trinket2) simply have no UI square, so they
+can't be equipped from the panel even though `Equipment` handles them fine.
 
 `EquippableItem` (ScriptableObject) fields: `slot`, `displayName`,
 `bonusStats` (Stats, added while equipped), `weaponDamage` (MainHand only),
@@ -151,12 +178,19 @@ adjacent-attack if no `BattleManager` exists in the scene.
   follow position each frame (avoids two systems fighting over the
   camera's transform). Triggered on crit via `Entity.Attack`.
 
-## Enemy loot
+## Enemy loot — ⚠️ NO DROPS ACTUALLY HAPPEN
 
-`EnemyController.Die()` rolls `LootTable` (ScriptableObject, weighted drops)
-and spawns an `EquipmentDropPickup` on the enemy's cell, plus grants XP to
-the killer (see Leveling above). `GameManager` tracks spawned drops for
-floor-transition cleanup.
+`EnemyController.Die()` is written to roll `LootTable` (ScriptableObject,
+weighted drops) and spawn an `EquipmentDropPickup` on the enemy's cell, and
+`GameManager` does track spawned drops for floor-transition cleanup.
+
+But **no `LootTable` asset has ever been created** — only the script — and
+`Enemy.prefab` serializes `lootTable: {fileID: 0}` (null). So the roll is
+skipped and enemies drop nothing. The XP grant on the same code path is dead
+too, for the separate reason above.
+
+Fix is two pieces of data, no code: author a `LootTable` asset and assign it
+on `Enemy.prefab`.
 
 ## Key files
 
