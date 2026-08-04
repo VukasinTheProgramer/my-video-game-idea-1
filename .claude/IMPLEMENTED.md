@@ -146,10 +146,27 @@ system, no set bonuses, no Mythic passives, no Runic sockets).
 `SortByItemLevel()` (highest first, other stat as tiebreaker), wrapped by
 `EquipmentPanelUI.SortBagByRarity()`/`SortBagByItemLevel()`.
 
-`ItemSlotUI`: one square per item, icon + rarity-colored outline border,
-right-click to open a tooltip (`ItemTooltipUI`) showing stats with an
-Equip/Unequip action button. Bag slots are pooled/built at runtime, no
-prefab needed.
+`ItemSlotUI`: one square per item, icon + rarity-colored outline border.
+Two ways to equip/unequip, both routed through the same
+`EquipmentPanelUI.EquipFromBag`/`UnequipSlot`/`UnequipItem` calls so there's
+one code path either way:
+- **Right-click** opens a tooltip (`ItemTooltipUI`) showing stats with an
+  Equip/Unequip action button.
+- **Drag and drop**: drag a bag item onto its matching equip slot (rejected
+  if dropped on the wrong slot type — a helmet dropped on Boots does
+  nothing, it doesn't equip into Head instead), or drag an equipped item
+  onto any bag slot to unequip it. Implemented via `IBeginDragHandler`/
+  `IDragHandler`/`IEndDragHandler`/`IDropHandler` on `ItemSlotUI` itself,
+  with `PointerEventData.pointerDrag` carrying the source slot to whichever
+  slot is under the pointer on drop — standard UGUI drag/drop, no custom
+  raycasting. An empty equip slot stays raycast-enabled-but-transparent
+  (not fully disabled) specifically so it can still catch a drop.
+  **Known gap**: unequip-by-drag needs at least one *active* bag slot to
+  drop onto — if the bag is completely empty, there's nowhere to drop an
+  equipped item to unequip it that way (the right-click tooltip still
+  works regardless).
+
+Bag slots are pooled/built at runtime, no prefab needed.
 
 `EquipmentDropPickup`/`HealthPotionPickup` both derive from an abstract
 `ItemPickup`; picking up a drop adds it to the bag, never auto-equips.

@@ -13,15 +13,17 @@ using UnityEngine.UI;
 /// hit-flash color substitution in Entity.cs).
 ///
 /// Right-click opens the item's tooltip (stats + an Equip/Unequip button) -
-/// there's no left-click instant-action anymore, so a misclick can't
-/// silently swap gear.
+/// there's no left-click instant-*click*-action, so a stray click can't
+/// silently swap gear. Left-click drag IS supported (SetDropTarget) - a
+/// deliberate drag is a different gesture than a misclick, so it doesn't
+/// reopen the bug the tooltip-only design was fixing.
 ///
 /// Builds its own child hierarchy in Awake, so it works whether it's
 /// hand-placed in a scene or spawned at runtime (EquipmentPanelUI's bag
 /// pool does the latter) - no prefab required.
 /// </summary>
 [RequireComponent(typeof(RectTransform))]
-public class ItemSlotUI : MonoBehaviour, IPointerClickHandler
+public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler
 {
     [SerializeField] private float outlineThickness = 4f;
     [SerializeField] private float motionPulseSeconds = 0.6f;
@@ -31,6 +33,18 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler
     private Button button;
     private Coroutine motionRoutine;
     private Action onRightClick;
+    private EquippableItem boundItem;
+
+    // Drop-target config, set by EquipmentPanelUI once per Refresh via SetDropTarget:
+    // null = a bag slot, accepts any dragged item (dropping an equipped item here
+    // means "unequip"). Non-null = an equip slot, only accepts a dragged item whose
+    // OWN .slot matches - dropping a helmet on the Boots square is rejected rather
+    // than silently equipping it into Head anyway.
+    private EquipmentSlot? acceptSlot;
+    private Action<EquippableItem> onDropped;
+    private bool acceptsDrops;
+
+    private RectTransform dragGhost;
 
     private void Awake()
     {
@@ -70,10 +84,23 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler
         rect.offsetMax = new Vector2(-inset, -inset);
     }
 
+    /// <summary>Configures this slot as a drop target. acceptSlot null = bag slot (accepts
+    /// any dragged item - a drop here means "unequip"); non-null = equip slot (only
+    /// accepts a dragged item whose own .slot matches this one). Call once per Refresh,
+    /// same as Bind - EquipmentPanelUI owns the wiring, this component just reports drops.</summary>
+    public void SetDropTarget(EquipmentSlot? acceptSlot, Action<EquippableItem> onDropped)
+    {
+        this.acceptSlot = acceptSlot;
+        this.onDropped = onDropped;
+        acceptsDrops = true;
+    }
+
     /// <summary>Shows item in this slot with its rarity outline. onRightClick fires on right-click (null = not interactable) and opens the item's stat tooltip with an Equip/Unequip button.</summary>
     public void Bind(EquippableItem item, Action onRightClick = null)
     {
         BuildHierarchy(); // safety if Bind is somehow called before Awake
+
+        boundItem = item;
 
         Sprite icon = item != null && item.walkDown != null && item.walkDown.Length > 0 ? item.walkDown[0] : null;
         iconImage.sprite = icon;
@@ -85,7 +112,12 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler
 
         if (item == null)
         {
-            outlineImage.enabled = false;
+            // Stays enabled (raycastable) but invisible, rather than disabled outright -
+            // a disabled Graphic doesn't raycast at all, and an empty EQUIP slot must
+            // still be a valid drop target (that's the main point of dropping an item:
+            // filling an empty slot). Zero visible difference from fully disabled.
+            outlineImage.color = new Color(0f, 0f, 0f, 0f);
+            outlineImage.enabled = true;
             return;
         }
 
@@ -111,6 +143,58 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler
     public void Clear()
     {
         Bind(null);
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (boundItem == null || iconImage.sprite == null) return;
+
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        var ghostGO = new GameObject("DragGhost", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        dragGhost = (RectTransform)ghostGO.transform;
+        dragGhost.SetParent(canvas.transform, false);
+        dragGhost.SetAsLastSibling();
+        dragGhost.sizeDelta = iconImage.rectTransform.rect.size;
+
+        Image ghostImage = ghostGO.GetComponent<Image>();
+        ghostImage.sprite = iconImage.sprite;
+        ghostImage.preserveAspect = true;
+        // Must not intercept the raycast meant for whatever's underneath it - that
+        // raycast is exactly how the EventSystem finds the drop target.
+        ghostImage.raycastTarget = false;
+
+        dragGhost.position = eventData.position;
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (dragGhost != null) dragGhost.position = eventData.position;
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        if (dragGhost != null)
+        {
+            Destroy(dragGhost.gameObject);
+            dragGhost = null;
+        }
+    }
+
+    /// <summary>Called by the EventSystem on whatever slot is under the pointer when a drag
+    /// ends - fires before OnEndDrag on the slot that started the drag.</summary>
+    public void OnDrop(PointerEventData eventData)
+    {
+        if (!acceptsDrops || eventData.pointerDrag == null) return;
+
+        ItemSlotUI source = eventData.pointerDrag.GetComponent<ItemSlotUI>();
+        if (source == null || source == this || source.boundItem == null) return;
+
+        EquippableItem item = source.boundItem;
+        if (acceptSlot.HasValue && item.slot != acceptSlot.Value) return; // wrong slot type - reject, don't equip elsewhere
+
+        onDropped?.Invoke(item);
     }
 
     private void StopMotion()

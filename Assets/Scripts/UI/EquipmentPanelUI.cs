@@ -5,9 +5,13 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Shows the player's 15 equipment slots and unlimited bag as ItemSlotUI
-/// squares (icon + rarity-colored outline). Clicking an equipped slot
-/// unequips it to the bag; clicking a bag slot equips it (swapping whatever
-/// was equipped back into the bag automatically).
+/// squares (icon + rarity-colored outline). Two ways to equip/unequip:
+/// right-click a slot for a tooltip with an Equip/Unequip button, or drag an
+/// item from the bag onto its matching equip slot (or drag an equipped item
+/// onto the bag to unequip it) - both end up calling EquipFromBag/UnequipSlot/
+/// UnequipItem, so there's exactly one equip/unequip code path either way.
+/// Dropping an item onto the wrong equip slot type is rejected (ItemSlotUI.
+/// SetDropTarget), not silently equipped somewhere else.
 ///
 /// slotUIs must be sized 15 and ordered to match SlotOrder (Head, Neck,
 /// MainHand, OffHand, Shoulders, Chest, Hands, Back, Legs, Feet, Belt,
@@ -190,6 +194,25 @@ public class EquipmentPanelUI : MonoBehaviour
         Refresh();
     }
 
+    /// <summary>Unequips by item rather than slot index - used by drag-to-unequip
+    /// (dropping an equipped item onto the bag), where the drop target only knows
+    /// the dragged item, not which SlotOrder index it came from. No-op if the item
+    /// isn't actually equipped (e.g. dropped a bag item onto the bag).</summary>
+    private void UnequipItem(EquippableItem item)
+    {
+        if (item == null) return;
+
+        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
+        if (player == null) return;
+
+        Equipment equipment = player.GetComponent<Equipment>();
+        if (equipment == null) return;
+        if (equipment.GetEquipped(item.slot) != item) return; // not actually the equipped item in that slot
+
+        equipment.Unequip(item.slot);
+        Refresh();
+    }
+
     /// <summary>Right-click on an equipped slot: shows the item's stats with an Unequip button.</summary>
     private void ShowUnequipTooltip(int slotOrderIndex, EquippableItem item)
     {
@@ -249,6 +272,7 @@ public class EquipmentPanelUI : MonoBehaviour
             if (slotUIs != null && i < slotUIs.Length && slotUIs[i] != null)
             {
                 slotUIs[i].Bind(item, item != null ? () => ShowUnequipTooltip(slotIndex, item) : (System.Action)null);
+                slotUIs[i].SetDropTarget(SlotOrder[i], EquipFromBag);
             }
 
             if (slotLabels != null && i < slotLabels.Length && slotLabels[i] != null)
@@ -328,6 +352,9 @@ public class EquipmentPanelUI : MonoBehaviour
                 EquippableItem bagItem = items[i]; // capture the item, never the index
                 bagSlotPool[i].gameObject.SetActive(true);
                 bagSlotPool[i].Bind(bagItem, () => ShowEquipTooltip(bagItem));
+                // null acceptSlot = a bag slot takes any dragged item - dropping an
+                // equipped item here means "unequip".
+                bagSlotPool[i].SetDropTarget(null, UnequipItem);
             }
             else
             {
