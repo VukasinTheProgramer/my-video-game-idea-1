@@ -62,8 +62,22 @@ prefab that uses it. A rename is a data migration, not a refactor.
 ## 1. How work gets done here (the loop)
 
 There is no way to drive the Unity Editor GUI from this environment. Only the
-user can click Play. Every scene/prefab/asset change goes through a throwaway
-headless script.
+user can click Play.
+
+**Fast path (2026-08-05+):** `unity-mcp` (`com.coplaydev.unity-mcp` in
+`Packages/manifest.json`) is installed and registered as an MCP server
+(`claude mcp list` → `UnityMCP`, HTTP, `http://127.0.0.1:8080/mcp`). While the
+Editor is open, its 47 MCP tools can read/write scenes, prefabs, assets, and
+scripts, run tests, and exec arbitrary static methods directly — no
+kill-Editor/batchmode/relaunch cycle needed for most changes. It requires the
+Editor process to actually be running (`Window → MCP for Unity` shows
+connection status); if `claude mcp list` shows UnityMCP disconnected, the
+Editor is closed or the HTTP bridge hasn't started yet.
+
+For anything the MCP tool catalog doesn't cover (bulk/scripted migrations,
+domain-reload-heavy play-mode test harnesses — see the gotchas below, which
+still apply since MCP tool calls run inside the same Editor process), fall
+back to the throwaway headless script pattern:
 
 ```bash
 # 1. Close the Editor first — it holds the project lock.
@@ -100,6 +114,15 @@ open -a /Applications/Unity/Hub/Editor/6000.0.80f1/Unity.app \
   the run hangs forever and orphans a Unity process.
 - **`timeout` does not exist on this machine** (zsh, no coreutils). Rely on the
   tool's own timeout.
+- **`EditorPrefs.SetBool` in a `-batchmode -quit` script doesn't reliably
+  flush to disk.** `-quit` tears the process down before the native side
+  syncs to `~/Library/Preferences/com.unity3d.UnityEditor5.x.plist` — the
+  in-process `GetBool` read-back after `SetBool` lies (returns the new value
+  from memory) even though nothing persisted. Verify with
+  `plutil -p ~/Library/Preferences/com.unity3d.UnityEditor5.x.plist | grep <key>`
+  after the process exits, not just a log line from inside `Run()`. If it's
+  missing, write the plist key directly instead:
+  `defaults write com.unity3d.UnityEditor5.x <Key> -bool true`.
 - **VS Code / OmniSharp lies.** It shows stale errors for minutes after new
   sibling `.cs` files appear. This has produced two false alarms. **The headless
   compile is the only source of truth.** Fix = reload the VS Code window.
