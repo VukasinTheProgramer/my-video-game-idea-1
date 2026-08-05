@@ -38,10 +38,8 @@ crashlytics-build.properties
 .idea/
 .DS_Store
 
-# Claude Code machine-local state. The project docs in .claude/
-# (IMPLEMENTED.md, IN_PROGRESS.md, ROADMAP.md) stay tracked on purpose.
-.claude/settings.local.json
-.claude/*.local.*
+# Claude Code project state — now untracked entirely, kept local only.
+.claude/
 
 # Asset meta backups
 *.orig
