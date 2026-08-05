@@ -43,3 +43,13 @@ crashlytics-build.properties
 
 # Asset meta backups
 *.orig
+
+# Ruflo — local tooling, untracked entirely like .claude/ above
+.env
+.env.local
+.env.*.local
+.claude-flow/
+.agents/
+.swarm/
+.mcp.json
+ruvector.db
