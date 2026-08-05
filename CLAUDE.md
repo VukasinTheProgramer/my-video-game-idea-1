@@ -334,6 +334,13 @@ any systems that are fully written and never execute, this project's worst
 bug class), then `.claude/IMPLEMENTED.md` (what genuinely runs) and
 `.claude/ROADMAP.md` (what's only designed).
 
+Two designed-but-unbuilt systems are large enough to have their own files
+instead of living inside `ROADMAP.md`, which links to both rather than
+summarizing them: `.claude/LAYERS.md` (zone/floor grouping, boss cadence and
+boss multipliers) and `.claude/ITEM_SCALING.md` (item stat generation, which
+depends on Layers and is built after it). Same status as `ROADMAP.md` —
+designed, no code.
+
 Before trusting *any* "it's built" claim in those files, spend ten seconds on
 the §0 recipe:
 
