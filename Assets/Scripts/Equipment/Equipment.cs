@@ -4,9 +4,12 @@ using UnityEngine;
 public enum AnimAction { Walk, Attack, Hurt }
 
 /// <summary>
-/// Manages the player's 10 equipment slots as layered child sprite renderers,
+/// Manages the player's 15 equipment slots as layered child sprite renderers,
 /// kept in sync with the base body's current animation frame by
-/// DirectionalSpriteAnimator.ApplyFrame calls.
+/// DirectionalSpriteAnimator.ApplyFrame calls. Only 10 of the 15 carry LPC art;
+/// the stat-only five (Belt/Ring1/Ring2/Trinket1/Trinket2) still get a layer and
+/// a sorting order, but PickSprite returns null for them so nothing renders -
+/// see EquipmentLayerOrder.StatOnlyOrder.
 /// </summary>
 public class Equipment : MonoBehaviour
 {

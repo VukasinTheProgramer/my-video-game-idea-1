@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Linq;
+using System.Linq; // Enumerable.Contains on Inventory.Items (IReadOnlyList) in EquipFromBag
 using UnityEngine;
 using UnityEngine.UI;
 
