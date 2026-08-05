@@ -16,7 +16,7 @@ public class EquippableItem : ScriptableObject
     public Stats bonusStats = new Stats();
     [Tooltip("MainHand only - feeds CombatResolver's rawDamage. Ignored for other slots.")]
     public int weaponDamage;
-    public Rarity rarity = Rarity.Common;
+    public Rarity rarity = Rarity.Uncommon; // matches the pre-2026-08-05 default (was named Common then)
     [Tooltip("Hand-authored for now (v1 scope) - used for bag sorting and display. The full floor-scaling system (ROADMAP.md -> \"Item generation: floor & rarity stat scaling\") would set this per-drop instead of per-template.")]
     public int itemLevel = 1;
     [Tooltip("MainHand only - drives CombatResolver's scaling/defense stat pick (IMPLEMENTED.md -> \"Stat system\") and, later, attack pattern (ROADMAP.md -> \"Weapon-driven attack patterns\"). Leave None for non-weapon slots.")]

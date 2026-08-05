@@ -2,9 +2,9 @@ using UnityEngine;
 
 /// <summary>
 /// Rarity outline colors for item-slot UI (IMPLEMENTED.md -> "Equipment"): Common
-/// green, Rare blue, Epic purple, Legendary yellow, Set cyan, Mythic red,
-/// Runic red pulsing to black ("motion outline" - the only rarity that
-/// animates, everything else is a static colored frame).
+/// gray, Uncommon green, Rare blue, Epic purple, Legendary yellow, Set cyan,
+/// Mythic red, Runic red pulsing to black ("motion outline" - the only
+/// rarity that animates, everything else is a static colored frame).
 /// </summary>
 public static class RarityVisuals
 {
@@ -12,7 +12,8 @@ public static class RarityVisuals
     {
         switch (rarity)
         {
-            case Rarity.Common: return new Color(0.25f, 0.85f, 0.25f);
+            case Rarity.Common: return new Color(0.6f, 0.6f, 0.6f);
+            case Rarity.Uncommon: return new Color(0.25f, 0.85f, 0.25f);
             case Rarity.Rare: return new Color(0.25f, 0.55f, 1f);
             case Rarity.Epic: return new Color(0.65f, 0.25f, 0.95f);
             case Rarity.Legendary: return new Color(1f, 0.85f, 0.1f);

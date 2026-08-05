@@ -186,6 +186,31 @@ public class EquipmentPanelUI : MonoBehaviour
         Refresh();
     }
 
+    /// <summary>Sells a bag item for gold and removes it from the bag permanently -
+    /// this is the one deliberate exception to "never destroyed"
+    /// (ROADMAP.md -> "Currency: gold & gems", sell-from-bag sink). Only reachable
+    /// from the bag's tooltip, never the equip slots', so worn gear can't be sold
+    /// by accident - it has to be unequipped first. Removes the item from the
+    /// player's Inventory only; the EquippableItem asset itself is a shared
+    /// template other drops still reference, never destroyed.</summary>
+    public void SellFromBag(EquippableItem item)
+    {
+        if (item == null) return;
+
+        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
+        if (player == null) return;
+
+        Inventory inventory = player.GetComponent<Inventory>();
+        Wallet wallet = player.GetComponent<Wallet>();
+        if (inventory == null || wallet == null) return;
+        if (!inventory.Items.Contains(item)) return; // already sold/equipped/gone
+
+        int value = ItemPricing.SellValue(item);
+        inventory.Remove(item);
+        wallet.AddGold(value);
+        Refresh();
+    }
+
     /// <summary>Sends whatever's in this slot back to the bag.</summary>
     public void UnequipSlot(int slotOrderIndex)
     {
@@ -226,11 +251,12 @@ public class EquipmentPanelUI : MonoBehaviour
         tooltip.Show(item, "Unequip", () => UnequipSlot(slotOrderIndex));
     }
 
-    /// <summary>Right-click on a bag slot: shows the item's stats with an Equip button.</summary>
+    /// <summary>Right-click on a bag slot: shows the item's stats with Equip and Sell buttons.</summary>
     private void ShowEquipTooltip(EquippableItem item)
     {
         if (tooltip == null) return;
-        tooltip.Show(item, "Equip", () => EquipFromBag(item));
+        int sellValue = ItemPricing.SellValue(item);
+        tooltip.Show(item, "Equip", () => EquipFromBag(item), $"Sell ({sellValue}g)", () => SellFromBag(item));
     }
 
     /// <summary>Sorts the bag by rarity, highest first. Wire a "Sort by Rarity" Button to this.</summary>

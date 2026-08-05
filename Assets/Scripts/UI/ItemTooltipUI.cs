@@ -3,10 +3,11 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Popup shown on right-clicking an ItemSlotUI: item name (rarity-colored),
-/// its own stat bonuses, and one action button (Equip/Unequip) that performs
-/// the actual equip swap. Builds its own hierarchy in Awake, same
-/// self-building pattern as ItemSlotUI - drop it once under the equipment
-/// panel and EquipmentPanelUI drives it via Show/Hide.
+/// its own stat bonuses, and one or two action buttons (Equip/Unequip, plus
+/// an optional Sell for bag items) that perform the actual action. Builds
+/// its own hierarchy in Awake, same self-building pattern as ItemSlotUI -
+/// drop it once under the equipment panel and EquipmentPanelUI drives it
+/// via Show/Hide.
 /// </summary>
 [RequireComponent(typeof(RectTransform))]
 public class ItemTooltipUI : MonoBehaviour
@@ -15,6 +16,8 @@ public class ItemTooltipUI : MonoBehaviour
     private Text statsText;
     private Text actionLabel;
     private Button actionButton;
+    private Text secondActionLabel;
+    private Button secondActionButton;
 
     private void Awake()
     {
@@ -46,11 +49,17 @@ public class ItemTooltipUI : MonoBehaviour
         nameText = MakeText("NameText", 18, FontStyle.Bold);
         statsText = MakeText("StatsText", 14, FontStyle.Normal);
 
-        var buttonGO = new GameObject("ActionButton", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+        actionButton = MakeActionButton("ActionButton", out actionLabel);
+        secondActionButton = MakeActionButton("SecondActionButton", out secondActionLabel);
+    }
+
+    private Button MakeActionButton(string name, out Text label)
+    {
+        var buttonGO = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
         buttonGO.transform.SetParent(transform, false);
         buttonGO.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.2f, 1f);
         buttonGO.GetComponent<LayoutElement>().preferredHeight = 30f;
-        actionButton = buttonGO.GetComponent<Button>();
+        Button button = buttonGO.GetComponent<Button>();
 
         var labelGO = new GameObject("Label", typeof(RectTransform), typeof(Text));
         labelGO.transform.SetParent(buttonGO.transform, false);
@@ -59,11 +68,13 @@ public class ItemTooltipUI : MonoBehaviour
         labelRect.anchorMax = Vector2.one;
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
-        actionLabel = labelGO.GetComponent<Text>();
-        actionLabel.alignment = TextAnchor.MiddleCenter;
-        actionLabel.color = Color.white;
-        actionLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        actionLabel.fontSize = 14;
+        label = labelGO.GetComponent<Text>();
+        label.alignment = TextAnchor.MiddleCenter;
+        label.color = Color.white;
+        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        label.fontSize = 14;
+
+        return button;
     }
 
     private Text MakeText(string name, int fontSize, FontStyle style)
@@ -80,8 +91,13 @@ public class ItemTooltipUI : MonoBehaviour
         return text;
     }
 
-    /// <summary>Populates and shows the tooltip. actionLabelText/onAction drive the single button ("Equip" or "Unequip").</summary>
-    public void Show(EquippableItem item, string actionLabelText, System.Action onAction)
+    /// <summary>Populates and shows the tooltip. actionLabelText/onAction drive the
+    /// first button ("Equip" or "Unequip"). secondActionLabelText/onSecondAction are
+    /// optional - only bag items pass them (a "Sell (Ng)" action); equipped items
+    /// must be unequipped before they can be sold, so the second button stays
+    /// hidden for the unequip tooltip.</summary>
+    public void Show(EquippableItem item, string actionLabelText, System.Action onAction,
+        string secondActionLabelText = null, System.Action onSecondAction = null)
     {
         BuildHierarchy();
         // Hide rather than return: leaving the previous item's text and its stale
@@ -104,6 +120,19 @@ public class ItemTooltipUI : MonoBehaviour
             onAction?.Invoke();
             Hide();
         });
+
+        bool hasSecondAction = secondActionLabelText != null && onSecondAction != null;
+        secondActionButton.gameObject.SetActive(hasSecondAction);
+        if (hasSecondAction)
+        {
+            secondActionLabel.text = secondActionLabelText;
+            secondActionButton.onClick.RemoveAllListeners();
+            secondActionButton.onClick.AddListener(() =>
+            {
+                onSecondAction.Invoke();
+                Hide();
+            });
+        }
 
         gameObject.SetActive(true);
         transform.SetAsLastSibling();
