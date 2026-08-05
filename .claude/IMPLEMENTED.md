@@ -154,17 +154,26 @@ one code path either way:
   Equip/Unequip action button.
 - **Drag and drop**: drag a bag item onto its matching equip slot (rejected
   if dropped on the wrong slot type — a helmet dropped on Boots does
-  nothing, it doesn't equip into Head instead), or drag an equipped item
-  onto any bag slot to unequip it. Implemented via `IBeginDragHandler`/
-  `IDragHandler`/`IEndDragHandler`/`IDropHandler` on `ItemSlotUI` itself,
-  with `PointerEventData.pointerDrag` carrying the source slot to whichever
-  slot is under the pointer on drop — standard UGUI drag/drop, no custom
+  nothing, it doesn't equip into Head instead; dropping onto an *occupied*
+  slot swaps — the displaced item goes back to the bag, same as
+  `Equipment.Equip` always did), or drag an equipped item onto the bag to
+  unequip it. Implemented via `IBeginDragHandler`/`IDragHandler`/
+  `IEndDragHandler`/`IDropHandler` on `ItemSlotUI` itself, with
+  `PointerEventData.pointerDrag` carrying the source slot to whichever slot
+  is under the pointer on drop — standard UGUI drag/drop, no custom
   raycasting. An empty equip slot stays raycast-enabled-but-transparent
   (not fully disabled) specifically so it can still catch a drop.
-  **Known gap**: unequip-by-drag needs at least one *active* bag slot to
-  drop onto — if the bag is completely empty, there's nowhere to drop an
-  equipped item to unequip it that way (the right-click tooltip still
-  works regardless).
+  `BagDropZone` (a fully transparent `Image` + `IDropHandler` that
+  `EquipmentPanelUI.Awake` attaches to `bagSlotContainer` itself) catches a
+  drop anywhere in the empty space of the bag — not just on an occupied
+  `ItemSlotUI` — so unequip-by-drag works even when the bag is completely
+  empty; individual item slots are children rendered on top and still win
+  the raycast at their own position.
+  `ItemSlotUI.OnDrop` destroys the *source* slot's drag-ghost proactively,
+  before invoking the equip/unequip callback — that callback triggers
+  `Refresh()`, which can `SetActive(false)` the source bag slot the instant
+  the bag shrinks by one, and a disabled GameObject never receives its own
+  `OnEndDrag`, which used to leave the ghost icon stuck on screen.
 
 Bag slots are pooled/built at runtime, no prefab needed.
 
@@ -292,6 +301,6 @@ an item's actual numbers) are `ROADMAP.md` → "Item generation", not this.
 | Items on the floor | `Assets/Scripts/Items/ItemPickup.cs`, `HealthPotionPickup.cs`, `EquipmentDropPickup.cs`, `LootTable.cs` |
 | Battle screen | `Assets/Scripts/Managers/BattleManager.cs`, `Assets/Scripts/UI/BattleScreenUI.cs` |
 | Outro screens | `Assets/Scripts/UI/VictoryScreenUI.cs`, `LevelUpUI.cs`, `FloorCompleteUI.cs`, `ModalScreenUI.cs` |
-| Equipment/bag UI | `Assets/Scripts/UI/EquipmentPanelUI.cs`, `ItemSlotUI.cs`, `ItemTooltipUI.cs` |
+| Equipment/bag UI | `Assets/Scripts/UI/EquipmentPanelUI.cs`, `ItemSlotUI.cs`, `ItemTooltipUI.cs`, `BagDropZone.cs` |
 | Feedback | `Assets/Scripts/UI/DamageNumberSpawner.cs`, `DamageNumberMotion.cs`, `UI/CameraShake.cs`, `Core/CameraFollow.cs` |
 | Turn loop / grid | `Assets/Scripts/Core/TurnManager.cs`, `DungeonGrid.cs`, `GridUtils.cs` |

@@ -34,6 +34,7 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
     private Coroutine motionRoutine;
     private Action onRightClick;
     private EquippableItem boundItem;
+    public EquippableItem BoundItem => boundItem;
 
     // Drop-target config, set by EquipmentPanelUI once per Refresh via SetDropTarget:
     // null = a bag slot, accepts any dragged item (dropping an equipped item here
@@ -175,11 +176,7 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
 
     public void OnEndDrag(PointerEventData eventData)
     {
-        if (dragGhost != null)
-        {
-            Destroy(dragGhost.gameObject);
-            dragGhost = null;
-        }
+        DestroyGhost();
     }
 
     /// <summary>Called by the EventSystem on whatever slot is under the pointer when a drag
@@ -194,7 +191,27 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
         EquippableItem item = source.boundItem;
         if (acceptSlot.HasValue && item.slot != acceptSlot.Value) return; // wrong slot type - reject, don't equip elsewhere
 
+        // Destroy the source's ghost BEFORE invoking the drop - onDropped triggers
+        // EquipmentPanelUI.Refresh(), which can SetActive(false) the source slot
+        // (e.g. a bag slot dropping below the shrunk item count). A disabled
+        // GameObject never receives its own OnEndDrag, so waiting for that would
+        // leave the ghost icon stuck on screen forever - this was a real bug, not
+        // hypothetical (equip-from-bag reliably shrinks the bag by exactly one).
+        source.DestroyGhost();
+
         onDropped?.Invoke(item);
+    }
+
+    /// <summary>Destroys this slot's in-flight drag ghost, if any. Public so a drop
+    /// target (ItemSlotUI.OnDrop, BagDropZone.OnDrop) can clean up the SOURCE
+    /// slot's ghost proactively before triggering a Refresh that might deactivate it.</summary>
+    public void DestroyGhost()
+    {
+        if (dragGhost != null)
+        {
+            Destroy(dragGhost.gameObject);
+            dragGhost = null;
+        }
     }
 
     private void StopMotion()

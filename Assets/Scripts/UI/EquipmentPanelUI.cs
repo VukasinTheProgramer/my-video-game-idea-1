@@ -64,6 +64,12 @@ public class EquipmentPanelUI : MonoBehaviour
         if (attackPointButton != null) attackPointButton.onClick.AddListener(() => SpendPoint(PlayerProgression.AllocatableStat.Attack));
         if (healthPointButton != null) healthPointButton.onClick.AddListener(() => SpendPoint(PlayerProgression.AllocatableStat.Health));
         if (agilityPointButton != null) agilityPointButton.onClick.AddListener(() => SpendPoint(PlayerProgression.AllocatableStat.Agility));
+
+        // Without this, drag-to-unequip only works if the bag already has an active
+        // item slot to land on - an empty (or nearly-full-elsewhere) bag has nowhere
+        // to drop onto at all, since bagSlotContainer itself starts with no
+        // raycastable graphic (just a layout group).
+        BagDropZone.Attach(bagSlotContainer, UnequipItem);
     }
 
     private void Start()
