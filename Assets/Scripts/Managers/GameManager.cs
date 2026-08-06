@@ -18,28 +18,13 @@ public class GameManager : MonoBehaviour
     [SerializeField] private PlayerController playerPrefab;
     [SerializeField] private EnemyController enemyPrefab;
     [SerializeField] private HealthPotionPickup itemPrefab;
-    [SerializeField] [Range(0f, 1f)] private float itemSpawnChance = 0.5f;
     [SerializeField] private EquippableItem startingWeapon;
 
-    [Header("Floor scaling (all values are per-floor growth; floor 1 = prefab defaults)")]
-    [Tooltip("Layer 0 (.claude/LAYERS.md) is flat - \"no depth scaling of any kind\" across its first N floors, room/enemy count included. Every field below this one is pinned to its floor-1 value through here; scaling (the old additive formula, offset to start from floor Layer0FloorCount+1 instead of floor 2) only resumes past it, as a placeholder until Layer 1's real exponential curve is designed (LAYERS.md -> \"Open / undecided\" leaves hard-jump-vs-continuous at that boundary unresolved - this picks continuous, not a settled design).")]
-    [SerializeField] private int layer0FloorCount = 10;
-    [Tooltip("Extra rooms are added every N floors.")]
-    [SerializeField] private int floorsPerExtraRoom = 2;
-    [SerializeField] private int maxRoomCount = 14;
-
-    [Tooltip("An extra enemy per room is added every N floors.")]
-    [SerializeField] private int floorsPerExtraEnemy = 4;
-    [SerializeField] private int maxEnemiesPerRoom = 3;
-
-    [Tooltip("Bonus enemy max health per floor.")]
-    [SerializeField] private int enemyHealthPerFloor = 2;
-
-    [Tooltip("Bonus enemy damage, applied every 2 floors to keep it gentler than health.")]
-    [SerializeField] private int enemyDamagePerFloor = 1;
-
-    [Tooltip("Bonus gold per enemy kill, added per floor past the first (ROADMAP.md -> \"Currency: gold & gems\").")]
-    [SerializeField] private int goldBonusPerFloor = 1;
+    // Every per-floor tuning knob lives here instead of as fields on this class,
+    // per CLAUDE.md's rule 4 ("Data that designers tune = ScriptableObject.
+    // Logic = component or static resolver. Never both in one class.") - this
+    // class stayed the orchestrator, the numbers moved to FloorScalingConfig.
+    [SerializeField] private FloorScalingConfig scaling;
 
     public int CurrentFloor { get; private set; } = 1;
     public event Action<int> OnFloorChanged;
@@ -82,11 +67,28 @@ public class GameManager : MonoBehaviour
             Debug.LogError("GameManager: assign a DungeonGenerator in the inspector.");
             return;
         }
+        if (scaling == null)
+        {
+            Debug.LogError("GameManager: assign a FloorScalingConfig in the inspector.");
+            return;
+        }
 
         DespawnPreviousFloor();
 
-        dungeonGenerator.SetRoomCount(RoomCountForFloor());
-        var rooms = dungeonGenerator.Generate();
+        // Same flatness boundary LayerAwareFloorStep already uses for stat scaling
+        // (floorStep == 0), so the tutorial layout and "everything is level 1" cover
+        // exactly the same floors - one shared check, not two that could drift apart.
+        List<RectInt> rooms;
+        if (LayerAwareFloorStep() == 0)
+        {
+            rooms = dungeonGenerator.GenerateLinear(scaling.layer0RoomCount, scaling.layer0RoomSize, scaling.layer0CorridorLength);
+        }
+        else
+        {
+            dungeonGenerator.SetRoomCount(RoomCountForFloor());
+            rooms = dungeonGenerator.Generate();
+        }
+
         if (rooms.Count == 0)
         {
             Debug.LogError("GameManager: dungeon generation produced no rooms. Check DungeonGenerator settings.");
@@ -160,14 +162,14 @@ public class GameManager : MonoBehaviour
     /// for Layer 0's floors so nothing scales there (LAYERS.md -> "Layer 0", "no
     /// depth scaling of any kind"), then resumes counting from floor
     /// layer0FloorCount+1 for whatever comes after (see the field's own tooltip).</summary>
-    private int LayerAwareFloorStep() => Mathf.Max(0, CurrentFloor - 1 - layer0FloorCount);
+    private int LayerAwareFloorStep() => Mathf.Max(0, CurrentFloor - 1 - scaling.layer0FloorCount);
 
     /// <summary>Rooms grow with depth, capped so generation stays reasonable.</summary>
     private int RoomCountForFloor()
     {
         int floorStep = LayerAwareFloorStep();
-        int extraRooms = floorsPerExtraRoom > 0 ? floorStep / floorsPerExtraRoom : 0;
-        return Mathf.Min(dungeonGenerator.BaseRoomCount + extraRooms, maxRoomCount);
+        int extraRooms = scaling.floorsPerExtraRoom > 0 ? floorStep / scaling.floorsPerExtraRoom : 0;
+        return Mathf.Min(dungeonGenerator.BaseRoomCount + extraRooms, scaling.maxRoomCount);
     }
 
     private void SpawnEnemies(int roomCount)
@@ -176,14 +178,14 @@ public class GameManager : MonoBehaviour
 
         int floorStep = LayerAwareFloorStep();
         int enemiesPerRoom = Mathf.Min(
-            1 + (floorsPerExtraEnemy > 0 ? floorStep / floorsPerExtraEnemy : 0),
-            maxEnemiesPerRoom);
+            1 + (scaling.floorsPerExtraEnemy > 0 ? floorStep / scaling.floorsPerExtraEnemy : 0),
+            scaling.maxEnemiesPerRoom);
         var floorBonus = new Stats
         {
-            maxHp = floorStep * enemyHealthPerFloor,
-            attack = (floorStep / 2) * enemyDamagePerFloor,
+            maxHp = floorStep * scaling.enemyHealthPerFloor,
+            attack = (floorStep / 2) * scaling.enemyDamagePerFloor,
         };
-        int goldFloorBonus = floorStep * goldBonusPerFloor;
+        int goldFloorBonus = floorStep * scaling.goldBonusPerFloor;
 
         // Rooms after the player's starting room get enemies; deeper floors pack in more.
         for (int roomIndex = 1; roomIndex < roomCount; roomIndex++)
@@ -231,7 +233,7 @@ public class GameManager : MonoBehaviour
 
         for (int roomIndex = 0; roomIndex < roomCount; roomIndex++)
         {
-            if (UnityEngine.Random.value > itemSpawnChance) continue;
+            if (UnityEngine.Random.value > scaling.itemSpawnChance) continue;
 
             Vector2Int spawnCell = dungeonGenerator.RandomCellInRoom(roomIndex);
             if (DungeonGrid.IsOccupied(spawnCell)) continue;

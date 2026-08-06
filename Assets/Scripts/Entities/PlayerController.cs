@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 /// <summary>
 /// Click-to-move only - no WASD/arrow keys. A click plans a route once
@@ -61,13 +62,42 @@ public class PlayerController : Entity
     /// screen point would name whatever cell had slid under the cursor by then.</summary>
     private void BufferClick()
     {
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return; // clicked UI, not the map
+        if (IsPointerOverBlockingUI()) return; // clicked UI, not the map
         if (Camera.main == null) return;
 
         Vector2Int cell = GridUtils.WorldToCell(Camera.main.ScreenToWorldPoint(Input.mousePosition));
         if (!DungeonGrid.IsWalkable(cell)) return; // clicked a wall — same as walking into one, not a valid target
 
         pendingClickCell = cell;
+    }
+
+    /// <summary>
+    /// True only if the pointer is over UI the player could actually interact with.
+    /// EventSystem.IsPointerOverGameObject() alone is NOT enough: Unity defaults every
+    /// Text/Image to raycastTarget = true, and the raycaster hit-tests the whole
+    /// RectTransform, not the visible glyphs - so a HUD label (even an empty one, like
+    /// GameOverText sitting invisible in the center of the screen) silently swallowed
+    /// every map click inside its 600x100 rect. That reads as "the game randomly won't
+    /// move," and because the camera follows the player, the dead zone is fixed to the
+    /// screen while sliding over the world, so it looks intermittent rather than
+    /// positional. The scene's labels have raycastTarget off now; this filter is the
+    /// guard that keeps the next added label from resurrecting the bug.
+    /// </summary>
+    private static bool IsPointerOverBlockingUI()
+    {
+        if (EventSystem.current == null) return false;
+
+        var pointer = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
+        var hits = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(pointer, hits);
+
+        foreach (RaycastResult hit in hits)
+        {
+            // A Selectable (Button/Slider/...) is a real control; anything else under
+            // the cursor is decoration that shouldn't consume a click meant for the map.
+            if (hit.gameObject.GetComponentInParent<Selectable>() != null) return true;
+        }
+        return false;
     }
 
     private void StartAutoWalk(Vector2Int goal)

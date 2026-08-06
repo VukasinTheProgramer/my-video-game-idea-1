@@ -3,22 +3,20 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// Very simple procedural dungeon generator: chains rooms together one at a
-/// time, each pair joined by a straight, fixed-width corridor shot off in a
-/// random cardinal direction, and registers every carved cell as walkable in
-/// DungeonGrid. Tilemap painting is optional — assign floorTilemap and
-/// floorTile in the inspector to see it visually; leave them empty and
-/// the grid logic still works (useful before you have art in).
+/// Two generation modes, both registering every carved cell as walkable in
+/// DungeonGrid: Generate() chains rooms together one at a time, each pair
+/// joined by a straight, fixed-width corridor shot off in a random cardinal
+/// direction (Layer 1+ - see LAYERS.md); GenerateLinear() is the same chain
+/// idea with size/direction/count all fixed instead of random, used for
+/// Layer 0's tutorial floors (GameManager picks which one runs per floor).
+/// Tilemap painting is optional — assign floorTilemap and floorTile in the
+/// inspector to see it visually; leave them empty and the grid logic still
+/// works (useful before you have art in).
 /// </summary>
 public class DungeonGenerator : MonoBehaviour
 {
     [Header("Generation")]
-    [SerializeField] private int roomCount = 6;
-    [SerializeField] private Vector2Int roomMinSize = new Vector2Int(4, 4);
-    [SerializeField] private Vector2Int roomMaxSize = new Vector2Int(8, 8);
-    [SerializeField] private Vector2Int mapBounds = new Vector2Int(40, 40);
-    [SerializeField] private Vector2Int corridorLengthRange = new Vector2Int(3, 6); // inclusive, cells
-    [SerializeField] private int seed = 0; // 0 = random each run
+    [SerializeField] private DungeonLayoutConfig layout;
 
     // Not exposed as a range — only one width was ever requested. Widen to a
     // SerializeField if a second value is ever needed.
@@ -30,18 +28,26 @@ public class DungeonGenerator : MonoBehaviour
 
     private readonly List<RectInt> rooms = new List<RectInt>();
 
-    // The inspector values are treated as the floor-1 baseline; SetRoomCount scales from these.
-    private int baseRoomCount;
-    private Vector2Int baseMapBounds;
+    // Working state for the current floor, seeded from layout's read-only
+    // floor-1 baseline in Awake and grown per floor by SetRoomCount - never
+    // written back to layout itself (see DungeonLayoutConfig's doc comment).
+    private int roomCount;
+    private Vector2Int mapBounds;
 
     private void Awake()
     {
-        baseRoomCount = Mathf.Max(1, roomCount);
-        baseMapBounds = mapBounds;
+        if (layout == null)
+        {
+            Debug.LogError("DungeonGenerator: assign a DungeonLayoutConfig in the inspector.");
+            return;
+        }
+
+        roomCount = Mathf.Max(1, layout.roomCount);
+        mapBounds = layout.mapBounds;
     }
 
-    /// <summary>The floor-1 room count, i.e. whatever was configured in the inspector.</summary>
-    public int BaseRoomCount => baseRoomCount;
+    /// <summary>The floor-1 room count, i.e. whatever's configured on the layout asset.</summary>
+    public int BaseRoomCount => layout.roomCount;
 
     /// <summary>
     /// Sets how many rooms the next Generate() should place, growing the map to match.
@@ -52,31 +58,23 @@ public class DungeonGenerator : MonoBehaviour
     {
         roomCount = Mathf.Max(1, count);
 
-        // Guard the divide: Awake doesn't run on an inactive GameObject, but
-        // GameManager.Start calls straight into this component either way, and a
-        // zero baseRoomCount would make growth Infinity and mapBounds NaN.
-        baseRoomCount = Mathf.Max(1, baseRoomCount);
-        if (baseMapBounds == Vector2Int.zero) baseMapBounds = mapBounds;
-
-        float growth = Mathf.Sqrt((float)roomCount / baseRoomCount);
-        mapBounds = Vector2Int.RoundToInt((Vector2)baseMapBounds * growth);
+        float growth = Mathf.Sqrt((float)roomCount / Mathf.Max(1, layout.roomCount));
+        mapBounds = Vector2Int.RoundToInt((Vector2)layout.mapBounds * growth);
     }
 
     /// <summary>Generates the dungeon and returns the room list (room 0 = player spawn).</summary>
     public List<RectInt> Generate()
     {
-        DungeonGrid.Reset();
-        rooms.Clear();
-        if (floorTilemap != null) floorTilemap.ClearAllTiles();
+        ResetForNewFloor();
 
         Random.State previousState = Random.state;
         // Offset by floor, or every floor re-seeds to the same value and generates a
         // byte-identical layout. Restoring the previous state afterwards keeps the
         // seed scoped to layout only - enemy/item/loot rolls stay unseeded.
-        if (seed != 0)
+        if (layout.seed != 0)
         {
             int floor = GameManager.Instance != null ? GameManager.Instance.CurrentFloor : 1;
-            Random.InitState(seed + floor);
+            Random.InitState(layout.seed + floor);
         }
 
         PlaceRooms();
@@ -84,6 +82,54 @@ public class DungeonGenerator : MonoBehaviour
 
         Random.state = previousState;
         return rooms;
+    }
+
+    /// <summary>
+    /// Layer 0's tutorial layout (LAYERS.md -> "Layer 0"): a straight line of
+    /// fixed-size rooms left to right, joined by fixed-length corridors - no
+    /// randomness anywhere (size, count, direction, AND alignment), so every
+    /// Layer 0 floor is the same predictable shape. Deliberately does NOT reuse
+    /// CorridorStart/RoomAfterCorridor's RandomBandOffset wobble - every room is
+    /// the same size, so holding the corridor at a fixed vertical center keeps
+    /// every room's y identical too, an exactly straight line instead of a
+    /// left-to-right chain that still drifts vertically. Kept entirely separate
+    /// from Generate()'s scattered chain (Layer 1+) rather than threading a
+    /// "linear mode" flag through it - the two share almost nothing once
+    /// everything stops being randomized. Rooms grow monotonically along +x
+    /// from a fixed origin, so unlike PlaceRooms this can't overlap or run out
+    /// of space - no bounds/overlap checks needed.
+    /// </summary>
+    public List<RectInt> GenerateLinear(int linearRoomCount, int roomSize, int corridorLength)
+    {
+        ResetForNewFloor();
+
+        RectInt first = new RectInt(0, 0, roomSize, roomSize);
+        rooms.Add(first);
+        CarveRoom(first);
+
+        int corridorY = roomSize / 2; // every room's vertical center - constant since every room shares this size, so yMin stays 0 for all of them
+
+        for (int i = 1; i < linearRoomCount; i++)
+        {
+            RectInt previous = rooms[rooms.Count - 1];
+            Vector2Int corridorStart = new Vector2Int(previous.xMax, corridorY);
+            Vector2Int lastCorridorCell = corridorStart + Vector2Int.right * (corridorLength - 1);
+            RectInt next = new RectInt(lastCorridorCell.x + 1, corridorY - roomSize / 2, roomSize, roomSize);
+
+            rooms.Add(next);
+            CarveRoom(next);
+            CarveCorridor(corridorStart, Vector2Int.right, corridorLength);
+        }
+
+        PaintTiles();
+        return rooms;
+    }
+
+    private void ResetForNewFloor()
+    {
+        DungeonGrid.Reset();
+        rooms.Clear();
+        if (floorTilemap != null) floorTilemap.ClearAllTiles();
     }
 
     private void PlaceRooms()
@@ -102,8 +148,8 @@ public class DungeonGenerator : MonoBehaviour
 
     private RectInt RandomRoom()
     {
-        int w = Random.Range(roomMinSize.x, roomMaxSize.x + 1);
-        int h = Random.Range(roomMinSize.y, roomMaxSize.y + 1);
+        int w = Random.Range(layout.roomMinSize.x, layout.roomMaxSize.x + 1);
+        int h = Random.Range(layout.roomMinSize.y, layout.roomMaxSize.y + 1);
         int x = Random.Range(-mapBounds.x / 2, mapBounds.x / 2 - w);
         int y = Random.Range(-mapBounds.y / 2, mapBounds.y / 2 - h);
         return new RectInt(x, y, w, h);
@@ -115,9 +161,9 @@ public class DungeonGenerator : MonoBehaviour
     private bool TryAddChainedRoom(RectInt previous)
     {
         Vector2Int dir = GridUtils.CardinalDirections[Random.Range(0, GridUtils.CardinalDirections.Length)];
-        int length = Random.Range(corridorLengthRange.x, corridorLengthRange.y + 1);
-        int w = Random.Range(roomMinSize.x, roomMaxSize.x + 1);
-        int h = Random.Range(roomMinSize.y, roomMaxSize.y + 1);
+        int length = Random.Range(layout.corridorLengthRange.x, layout.corridorLengthRange.y + 1);
+        int w = Random.Range(layout.roomMinSize.x, layout.roomMaxSize.x + 1);
+        int h = Random.Range(layout.roomMinSize.y, layout.roomMaxSize.y + 1);
 
         Vector2Int corridorStart = CorridorStart(previous, dir);
         Vector2Int lastCorridorCell = corridorStart + dir * (length - 1);
