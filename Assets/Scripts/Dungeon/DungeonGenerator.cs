@@ -3,9 +3,9 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// Very simple procedural dungeon generator: places a handful of
-/// non-overlapping rectangular rooms, connects them in sequence with
-/// L-shaped corridors, and registers every carved cell as walkable in
+/// Very simple procedural dungeon generator: chains rooms together one at a
+/// time, each pair joined by a straight, fixed-width corridor shot off in a
+/// random cardinal direction, and registers every carved cell as walkable in
 /// DungeonGrid. Tilemap painting is optional — assign floorTilemap and
 /// floorTile in the inspector to see it visually; leave them empty and
 /// the grid logic still works (useful before you have art in).
@@ -17,7 +17,12 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private Vector2Int roomMinSize = new Vector2Int(4, 4);
     [SerializeField] private Vector2Int roomMaxSize = new Vector2Int(8, 8);
     [SerializeField] private Vector2Int mapBounds = new Vector2Int(40, 40);
+    [SerializeField] private Vector2Int corridorLengthRange = new Vector2Int(3, 6); // inclusive, cells
     [SerializeField] private int seed = 0; // 0 = random each run
+
+    // Not exposed as a range — only one width was ever requested. Widen to a
+    // SerializeField if a second value is ever needed.
+    private const int CorridorWidth = 2;
 
     [Header("Rendering (optional)")]
     [SerializeField] private Tilemap floorTilemap;
@@ -75,7 +80,6 @@ public class DungeonGenerator : MonoBehaviour
         }
 
         PlaceRooms();
-        ConnectRooms();
         PaintTiles();
 
         Random.state = previousState;
@@ -84,22 +88,110 @@ public class DungeonGenerator : MonoBehaviour
 
     private void PlaceRooms()
     {
+        RectInt first = RandomRoom();
+        rooms.Add(first);
+        CarveRoom(first);
+
         int attempts = 0;
-        while (rooms.Count < roomCount && attempts < roomCount * 20)
+        while (rooms.Count < roomCount && attempts < roomCount * 30)
         {
             attempts++;
-
-            int w = Random.Range(roomMinSize.x, roomMaxSize.x + 1);
-            int h = Random.Range(roomMinSize.y, roomMaxSize.y + 1);
-            int x = Random.Range(-mapBounds.x / 2, mapBounds.x / 2 - w);
-            int y = Random.Range(-mapBounds.y / 2, mapBounds.y / 2 - h);
-
-            var candidate = new RectInt(x, y, w, h);
-            if (OverlapsExistingRoom(candidate)) continue;
-
-            rooms.Add(candidate);
-            CarveRoom(candidate);
+            TryAddChainedRoom(rooms[rooms.Count - 1]);
         }
+    }
+
+    private RectInt RandomRoom()
+    {
+        int w = Random.Range(roomMinSize.x, roomMaxSize.x + 1);
+        int h = Random.Range(roomMinSize.y, roomMaxSize.y + 1);
+        int x = Random.Range(-mapBounds.x / 2, mapBounds.x / 2 - w);
+        int y = Random.Range(-mapBounds.y / 2, mapBounds.y / 2 - h);
+        return new RectInt(x, y, w, h);
+    }
+
+    // Shoots a straight corridor off 'previous' in a random cardinal direction
+    // and places the next room at its far end, so length/width are exact by
+    // construction rather than whatever gap random placement happened to leave.
+    private bool TryAddChainedRoom(RectInt previous)
+    {
+        Vector2Int dir = GridUtils.CardinalDirections[Random.Range(0, GridUtils.CardinalDirections.Length)];
+        int length = Random.Range(corridorLengthRange.x, corridorLengthRange.y + 1);
+        int w = Random.Range(roomMinSize.x, roomMaxSize.x + 1);
+        int h = Random.Range(roomMinSize.y, roomMaxSize.y + 1);
+
+        Vector2Int corridorStart = CorridorStart(previous, dir);
+        Vector2Int lastCorridorCell = corridorStart + dir * (length - 1);
+        RectInt candidate = RoomAfterCorridor(lastCorridorCell, dir, w, h);
+
+        if (!InBounds(candidate) || OverlapsExistingRoom(candidate)) return false;
+
+        rooms.Add(candidate);
+        CarveRoom(candidate);
+        CarveCorridor(corridorStart, dir, length);
+        return true;
+    }
+
+    // Offset of a CorridorWidth-wide band along a wall of the given span, kept
+    // off the first/last cells so corridors only ever exit/enter the middle of
+    // a wall, never a corner. Margin scales down (instead of an all-or-nothing
+    // fallback to the full span) on rooms too small for the full 2-cell margin,
+    // so even a roomMinSize-sized room still keeps at least 1 cell clear on
+    // each end - only a span this thin (<= CorridorWidth) has zero margin left.
+    private int RandomBandOffset(int span)
+    {
+        int margin = Mathf.Clamp((span - CorridorWidth) / 2, 0, 2);
+        int lo = margin;
+        int hi = span - CorridorWidth - margin;
+        return Random.Range(lo, hi + 1);
+    }
+
+    // First cell outside 'room's wall in direction dir, offset along the wall so
+    // the CorridorWidth-wide band it anchors lands in the middle of the room's span.
+    private Vector2Int CorridorStart(RectInt room, Vector2Int dir)
+    {
+        if (dir.x != 0)
+        {
+            int x = dir.x > 0 ? room.xMax : room.xMin - 1;
+            int y = room.yMin + RandomBandOffset(room.yMax - room.yMin);
+            return new Vector2Int(x, y);
+        }
+        int yEdge = dir.y > 0 ? room.yMax : room.yMin - 1;
+        int xAnchor = room.xMin + RandomBandOffset(room.xMax - room.xMin);
+        return new Vector2Int(xAnchor, yEdge);
+    }
+
+    // Places the next room immediately past the corridor's last cell, offset
+    // along the wall so the corridor's band lands in the middle of the new room's span too.
+    private RectInt RoomAfterCorridor(Vector2Int lastCorridorCell, Vector2Int dir, int w, int h)
+    {
+        Vector2Int edge = lastCorridorCell + dir;
+        if (dir.x != 0)
+        {
+            int x = dir.x > 0 ? edge.x : edge.x + 1 - w;
+            int yMin = lastCorridorCell.y - RandomBandOffset(h);
+            return new RectInt(x, yMin, w, h);
+        }
+        int y = dir.y > 0 ? edge.y : edge.y + 1 - h;
+        int xMin = lastCorridorCell.x - RandomBandOffset(w);
+        return new RectInt(xMin, y, w, h);
+    }
+
+    private void CarveCorridor(Vector2Int start, Vector2Int dir, int length)
+    {
+        Vector2Int perp = dir.x != 0 ? Vector2Int.up : Vector2Int.right;
+        for (int step = 0; step < length; step++)
+        {
+            Vector2Int cell = start + dir * step;
+            DungeonGrid.AddWalkable(cell);
+            DungeonGrid.AddWalkable(cell + perp);
+        }
+    }
+
+    private bool InBounds(RectInt room)
+    {
+        int halfW = mapBounds.x / 2;
+        int halfH = mapBounds.y / 2;
+        return room.xMin >= -halfW && room.xMax <= halfW && room.yMin >= -halfH && room.yMax <= halfH;
     }
 
     private bool OverlapsExistingRoom(RectInt candidate)
@@ -122,32 +214,6 @@ public class DungeonGenerator : MonoBehaviour
                 DungeonGrid.AddWalkable(new Vector2Int(x, y));
             }
         }
-    }
-
-    private void ConnectRooms()
-    {
-        for (int i = 1; i < rooms.Count; i++)
-        {
-            Vector2Int a = Vector2Int.RoundToInt(rooms[i - 1].center);
-            Vector2Int b = Vector2Int.RoundToInt(rooms[i].center);
-            CarveLCorridor(a, b);
-        }
-    }
-
-    private void CarveLCorridor(Vector2Int a, Vector2Int b)
-    {
-        Vector2Int current = a;
-        while (current.x != b.x)
-        {
-            DungeonGrid.AddWalkable(current);
-            current.x += current.x < b.x ? 1 : -1;
-        }
-        while (current.y != b.y)
-        {
-            DungeonGrid.AddWalkable(current);
-            current.y += current.y < b.y ? 1 : -1;
-        }
-        DungeonGrid.AddWalkable(current);
     }
 
     private void PaintTiles()

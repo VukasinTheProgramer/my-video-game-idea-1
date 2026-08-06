@@ -896,7 +896,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 8
+  orthographic size: 5
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
@@ -3254,6 +3254,7 @@ MonoBehaviour:
   itemPrefab: {fileID: 676636541672477859, guid: 815b5c5b2d83746a38a8aa2a1f805077, type: 3}
   itemSpawnChance: 0.5
   startingWeapon: {fileID: 11400000, guid: 80c61ec32ba1f4c00bb041c3ff9315a6, type: 2}
+  layer0FloorCount: 10
   floorsPerExtraRoom: 2
   maxRoomCount: 14
   floorsPerExtraEnemy: 4
@@ -5731,6 +5732,7 @@ MonoBehaviour:
   roomMinSize: {x: 4, y: 4}
   roomMaxSize: {x: 8, y: 8}
   mapBounds: {x: 40, y: 40}
+  corridorLengthRange: {x: 3, y: 6}
   seed: 0
   floorTilemap: {fileID: 764266933}
   floorTile: {fileID: 11400000, guid: 817f6b50443554c47abc5559debe6699, type: 2}
