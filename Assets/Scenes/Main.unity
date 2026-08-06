@@ -2574,6 +2574,50 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1 &825897349
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 825897351}
+  - component: {fileID: 825897350}
+  m_Layer: 0
+  m_Name: InteractionPromptUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &825897350
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 825897349}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d1159f416dd64990bff5d3337de9b11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &825897351
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 825897349}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &827363140
 GameObject:
   m_ObjectHideFlags: 0
@@ -3254,6 +3298,10 @@ MonoBehaviour:
   enemyPrefab: {fileID: 2314456458880152076, guid: bfdc1362d54084733b902e10bc3fe57b, type: 3}
   itemPrefab: {fileID: 676636541672477859, guid: 815b5c5b2d83746a38a8aa2a1f805077, type: 3}
   startingWeapon: {fileID: 11400000, guid: 80c61ec32ba1f4c00bb041c3ff9315a6, type: 2}
+  signPrefab: {fileID: 7725061679162328115, guid: ae3205700d4764159b892871c04dc922, type: 3}
+  smallChestPrefab: {fileID: 2078689245019696712, guid: 55bfd6abae3ba4e59868a379828be5f5, type: 3}
+  largeChestPrefab: {fileID: 8926527205973685899, guid: 9cb2b08e386dd4d97b299d2eeb8ed876, type: 3}
+  specialChestPrefab: {fileID: 895304872551231267, guid: 76e7f5577d6474019acc96f5e1d16a72, type: 3}
   scaling: {fileID: 11400000, guid: 6752cef1d33df4babaf56d93465e3587, type: 2}
 --- !u!4 &1017308046
 Transform:
@@ -6417,3 +6465,4 @@ SceneRoots:
   - {fileID: 207569909}
   - {fileID: 183203061}
   - {fileID: 260807820}
+  - {fileID: 825897351}

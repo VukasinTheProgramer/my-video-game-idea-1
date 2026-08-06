@@ -16,7 +16,11 @@ public static class Pathfinder
 
     /// <summary>Fills cameFrom with the BFS tree from start; returns whether goal was
     /// reached. The goal cell is enterable even when occupied (so you can path *at* an
-    /// enemy to engage it), but no other occupied cell is.</summary>
+    /// enemy to engage it) or non-walkable (so you can path *at* a solid fixture like a
+    /// SignPost), but no other cell gets either exception. Safe even though the goal
+    /// bypasses both checks: current == goal returns immediately on dequeue, before its
+    /// neighbors are ever examined, so the goal can never become a through-cell used to
+    /// reach something beyond it - it's only ever a reachable leaf.</summary>
     private static bool Search(Vector2Int start, Vector2Int goal)
     {
         cameFrom.Clear();
@@ -33,7 +37,7 @@ public static class Pathfinder
             {
                 Vector2Int next = current + direction;
                 if (cameFrom.ContainsKey(next)) continue;
-                if (!DungeonGrid.IsWalkable(next)) continue;
+                if (next != goal && !DungeonGrid.IsWalkable(next)) continue;
                 if (next != goal && DungeonGrid.IsOccupied(next)) continue;
 
                 cameFrom[next] = current;

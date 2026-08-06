@@ -82,6 +82,19 @@ public class EquipmentPanelUI : MonoBehaviour
         BagDropZone.Attach(bagSlotContainer, UnequipItem);
     }
 
+    /// <summary>B ("Bag") and C ("Character") both open this same combined panel -
+    /// there's only one view today (equip slots + bag + stats together, per the
+    /// class doc comment), not separate bag-only/character-only screens, so both
+    /// keys are wired to the identical TogglePanel() call rather than inventing a
+    /// UI split nothing else asked for.</summary>
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.B) || Input.GetKeyDown(KeyCode.C))
+        {
+            TogglePanel();
+        }
+    }
+
     private void Start()
     {
         panelRoot.SetActive(false);

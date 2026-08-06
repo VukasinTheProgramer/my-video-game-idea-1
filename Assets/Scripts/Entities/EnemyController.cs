@@ -44,6 +44,25 @@ public class EnemyController : Entity
     /// per-floor scaling hook, applied to gold instead of Stats.</summary>
     public void SetGoldFloorBonus(int bonus) => goldFloorBonus = bonus;
 
+    // All default to "no change" (1f / false) so a plain enemy's Die() behaves
+    // identically to before this existed - only GameManager.SpawnBoss sets these,
+    // same opt-in-at-spawn pattern as SetGoldFloorBonus.
+    private float lootChanceMultiplier = 1f;
+    private float topTierRarityMultiplier = 1f;
+    private bool guaranteesMinRarity = false;
+    private Rarity guaranteedMinRarity = Rarity.Uncommon;
+
+    /// <summary>Set by GameManager on a boss spawn (LAYERS.md -> "Boss stat & loot
+    /// multipliers") to boost this kill's drop odds beyond a plain enemy's flat
+    /// RollDrops().</summary>
+    public void SetLootBonus(float slotChanceMultiplier, float rarityMultiplier, bool guaranteesMinRarity, Rarity guaranteedMinRarity)
+    {
+        lootChanceMultiplier = slotChanceMultiplier;
+        topTierRarityMultiplier = rarityMultiplier;
+        this.guaranteesMinRarity = guaranteesMinRarity;
+        this.guaranteedMinRarity = guaranteedMinRarity;
+    }
+
     /// <summary>Fires once per item, right after it's added to the killer's bag -
     /// BattleManager subscribes to list drops on the victory screen. Loot goes
     /// straight to the bag on kill, never spawns on the floor (IMPLEMENTED.md ->
@@ -168,7 +187,9 @@ public class EnemyController : Entity
         if (lootTable != null && player != null)
         {
             Inventory inventory = player.GetComponent<Inventory>();
-            foreach (EquippableItem drop in lootTable.RollDrops())
+            var drops = lootTable.RollDropsWithGuarantee(
+                lootChanceMultiplier, topTierRarityMultiplier, guaranteesMinRarity, guaranteedMinRarity);
+            foreach (EquippableItem drop in drops)
             {
                 // floorStep 0 - items never had per-floor scaling before this, so
                 // there's nothing to gate; stays off until Layer 1 exists

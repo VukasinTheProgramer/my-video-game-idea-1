@@ -89,17 +89,17 @@ public class DungeonGenerator : MonoBehaviour
     /// fixed-size rooms left to right, joined by fixed-length corridors - no
     /// randomness anywhere (size, count, direction, AND alignment), so every
     /// Layer 0 floor is the same predictable shape. Deliberately does NOT reuse
-    /// CorridorStart/RoomAfterCorridor's RandomBandOffset wobble - every room is
-    /// the same size, so holding the corridor at a fixed vertical center keeps
-    /// every room's y identical too, an exactly straight line instead of a
-    /// left-to-right chain that still drifts vertically. Kept entirely separate
-    /// from Generate()'s scattered chain (Layer 1+) rather than threading a
-    /// "linear mode" flag through it - the two share almost nothing once
-    /// everything stops being randomized. Rooms grow monotonically along +x
-    /// from a fixed origin, so unlike PlaceRooms this can't overlap or run out
-    /// of space - no bounds/overlap checks needed.
+    /// CorridorStart/RoomAfterCorridor's RandomBandOffset wobble - every room
+    /// shares the same yMin (a straight line), and the corridor sits at a fixed
+    /// row offset from it, rather than a random band or the room's center -
+    /// so resizing rooms later can't silently move the corridor's row. Kept
+    /// entirely separate from Generate()'s scattered chain (Layer 1+) rather
+    /// than threading a "linear mode" flag through it - the two share almost
+    /// nothing once everything stops being randomized. Rooms grow monotonically
+    /// along +x from a fixed origin, so unlike PlaceRooms this can't overlap or
+    /// run out of space - no bounds/overlap checks needed.
     /// </summary>
-    public List<RectInt> GenerateLinear(int linearRoomCount, int roomSize, int corridorLength)
+    public List<RectInt> GenerateLinear(int linearRoomCount, int roomSize, int corridorLength, int corridorRow)
     {
         ResetForNewFloor();
 
@@ -107,14 +107,15 @@ public class DungeonGenerator : MonoBehaviour
         rooms.Add(first);
         CarveRoom(first);
 
-        int corridorY = roomSize / 2; // every room's vertical center - constant since every room shares this size, so yMin stays 0 for all of them
+        int roomY = first.yMin; // every room in the chain shares this y
+        int corridorGlobalY = roomY + corridorRow; // occupies this row and the one above it (CarveCorridor's perp offset)
 
         for (int i = 1; i < linearRoomCount; i++)
         {
             RectInt previous = rooms[rooms.Count - 1];
-            Vector2Int corridorStart = new Vector2Int(previous.xMax, corridorY);
+            Vector2Int corridorStart = new Vector2Int(previous.xMax, corridorGlobalY);
             Vector2Int lastCorridorCell = corridorStart + Vector2Int.right * (corridorLength - 1);
-            RectInt next = new RectInt(lastCorridorCell.x + 1, corridorY - roomSize / 2, roomSize, roomSize);
+            RectInt next = new RectInt(lastCorridorCell.x + 1, roomY, roomSize, roomSize);
 
             rooms.Add(next);
             CarveRoom(next);

@@ -185,16 +185,29 @@ Single scene: `Assets/Scenes/Main.unity`. Single build target entry.
 ### Static registries (not MonoBehaviours)
 
 - **`DungeonGrid`** — the source of truth: walkable cells, `Entity` occupancy,
-  and one `ItemPickup` per cell. Reset by `DungeonGenerator.Generate()`.
-- **`GridUtils`** — cell↔world math, Manhattan distance, `CardinalDirections`.
+  one `ItemPickup` per cell, and (since 2026-08-06) one `IInteractable` per
+  cell (signs/chests — `RegisterInteractable`/`GetInteractable`/
+  `Interactables`, the last returning the concrete `Dictionary<>.
+  ValueCollection` to avoid enumerator boxing). Reset by
+  `DungeonGenerator.Generate()`/`GenerateLinear()`.
+- **`GridUtils`** — cell↔world math, Manhattan **and** Chebyshev distance,
+  `CardinalDirections`.
 - **`CombatResolver`** — stateless. The **only** damage formula in the project.
 - **`EquipmentLayerOrder`** — sprite sorting constants (see §3).
 - **`LpcSpriteFormat`** — LPC frame counts (walk 9, slash 6, hurt 6, 64px).
+- **`Pathfinder`** — BFS `Search`/`FindNextStep` (single-step, safe against a
+  moving goal) and `FindPath` (plans once, `PlayerController` follows it
+  without re-planning — re-planning every turn against a moving enemy caused
+  visible oscillation). The goal cell alone bypasses both the walkable and
+  occupied checks, so a solid interactable (sign/chest) is still a valid
+  click target.
 
 ### Singletons (`Instance`, set in `Awake`)
 
 `GameManager` · `TurnManager` · `BattleManager` · `DamageNumberSpawner`
-(self-bootstrapping — creates itself on first access, so it needs no scene object).
+(self-bootstrapping — creates itself on first access, so it needs no scene
+object). `MainMenuUI`/`MessagePopupUI`/`InteractionPromptUI` follow the same
+self-bootstrapping idiom as the outro screens (§6) — no scene wiring needed.
 
 ### UI binds to the player once, via an event
 
@@ -210,18 +223,25 @@ sites respectively as of 2026-08-06); binding them is tracked as debt in
 ### Flow
 
 ```
-GameManager.Start
-  └─ GenerateFloor
-       ├─ DespawnPreviousFloor      (destroys enemies/items/drops)
-       ├─ DungeonGenerator.Generate (rooms → corridors → tilemap; resets DungeonGrid)
-       ├─ SpawnOrMovePlayer         (player is created ONCE, then only moved)
-       ├─ SpawnEnemies              (+ per-floor stat bonus via ApplyStatBonus)
-       └─ SpawnItems
+MainMenuUI.Start button → GameManager.BeginRun
+  └─ GenerateFloor       (the dungeon doesn't exist before Start is pressed)
+       ├─ DespawnPreviousFloor        (destroys enemies/items/drops)
+       ├─ DungeonGenerator.Generate   (Layer 1+, scattered) or
+       │  DungeonGenerator.GenerateLinear (Layer 0, floors 1-10, fixed chain)
+       ├─ SpawnOrMovePlayer           (player is created ONCE, then only moved)
+       ├─ SpawnEnemies                (+ per-floor stat bonus via ApplyStatBonus,
+       │                                + floors 1-5 exponential HP/ATK ramp)
+       ├─ SpawnBoss                   (floor 5 only, one extra boosted enemy)
+       ├─ SpawnItems / SpawnChests
+       ├─ SpawnTutorialSign / SpawnFloorTestFixtures
+       └─ OnFloorChanged fires
 
 TurnManager: PlayerTurn ⇄ EnemyTurn
-  PlayerController.Update → TryAct(direction)
-      wall            → return, turn NOT spent
-      empty cell      → MoveTo + maybe pick up item
+  PlayerController.Update → click-to-move only (no WASD/arrows)
+      click empty/walkable cell → Pathfinder.FindPath, walk it one cell/turn
+      click enemy               → path adjacent, then BattleManager.TryEngageIfInRange
+      E near an IInteractable   → Interact() (sign reads, chest opens)
+      wall            → step skipped, turn NOT spent
       enemy in range  → BattleManager.TryEngageIfInRange → battle screen
       else            → EndPlayerTurn
 ```
@@ -264,7 +284,9 @@ a concrete scale reason:
 - **Folder layout stays type-based** (`Core/`, `Entities/`, `Equipment/`,
   `Items/`, `Managers/`, `UI/`), not feature-based. Not worth the `.meta`
   churn at this size. New systems (`Scripts/Shop/`, `Scripts/Save/`) can
-  still be feature-foldered without moving anything existing.
+  still be feature-foldered without moving anything existing — `Scripts/
+  Dungeon/` (generator, layout config, signs, chests, `IInteractable`) is
+  the first realized example of this, added 2026-08-06.
 
 ---
 

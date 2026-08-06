@@ -13,14 +13,19 @@ MonoBehaviour:
   m_Name: FloorScalingConfig
   m_EditorClassIdentifier: 
   itemSpawnChance: 0.5
+  chestSpawnChance: 0.15
+  largeChestChance: 0.25
   layer0FloorCount: 10
   layer0RoomCount: 3
   layer0RoomSize: 6
   layer0CorridorLength: 5
+  layer0CorridorRow: 2
   floorsPerExtraRoom: 2
   maxRoomCount: 14
   floorsPerExtraEnemy: 4
   maxEnemiesPerRoom: 3
   enemyHealthPerFloor: 2
+  earlyFloorHealthGrowthRate: 1.316074
   enemyDamagePerFloor: 1
+  earlyFloorAttackGrowthRate: 1.316074
   goldBonusPerFloor: 1

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Entry point for a dungeon run: generates the layout, spawns the player
@@ -19,6 +20,13 @@ public class GameManager : MonoBehaviour
     [SerializeField] private EnemyController enemyPrefab;
     [SerializeField] private HealthPotionPickup itemPrefab;
     [SerializeField] private EquippableItem startingWeapon;
+    [SerializeField] private SignPost signPrefab;
+    [Tooltip("Two chest sizes, same LootChest script, different footprint data (see LootChest.Footprint). ChooseChestPrefab rolls which one spawns.")]
+    [FormerlySerializedAs("chestPrefab")]
+    [SerializeField] private LootChest smallChestPrefab;
+    [SerializeField] private LootChest largeChestPrefab;
+    [Tooltip("Third chest variant, floor 3's guaranteed test fixture only - not part of the normal random SpawnChests roll (see SpawnFloorTestFixture).")]
+    [SerializeField] private LootChest specialChestPrefab;
 
     // Every per-floor tuning knob lives here instead of as fields on this class,
     // per CLAUDE.md's rule 4 ("Data that designers tune = ScriptableObject.
@@ -42,6 +50,8 @@ public class GameManager : MonoBehaviour
     private PlayerController player;
     private readonly List<EnemyController> spawnedEnemies = new List<EnemyController>();
     private readonly List<HealthPotionPickup> spawnedItems = new List<HealthPotionPickup>();
+    private readonly List<SignPost> spawnedSigns = new List<SignPost>();
+    private readonly List<LootChest> spawnedChests = new List<LootChest>();
 
     private void Awake()
     {
@@ -58,6 +68,18 @@ public class GameManager : MonoBehaviour
     public void BeginRun()
     {
         GenerateFloor();
+
+        // Shown once, here, rather than gated some other way - BeginRun itself only
+        // ever runs once per session (MainMenuUI's Start button calls it exactly
+        // once), so no extra "have I shown this" flag is needed. Direct UI call from
+        // GameManager, not an event - same already-established precedent as
+        // FloorCompleteUI/VictoryScreenUI being called directly from GameManager/
+        // BattleManager, not the CombatFeedback-listener pattern CLAUDE.md rule 3
+        // reserves for combat-only feedback.
+        MessagePopupUI.Instance.Show(
+            "Welcome",
+            "Welcome, adventurer. You've found yourself in quite a bit of trouble, " +
+            "but don't worry - we'll guide you through it.");
     }
 
     private void GenerateFloor()
@@ -81,7 +103,7 @@ public class GameManager : MonoBehaviour
         List<RectInt> rooms;
         if (LayerAwareFloorStep() == 0)
         {
-            rooms = dungeonGenerator.GenerateLinear(scaling.layer0RoomCount, scaling.layer0RoomSize, scaling.layer0CorridorLength);
+            rooms = dungeonGenerator.GenerateLinear(scaling.layer0RoomCount, scaling.layer0RoomSize, scaling.layer0CorridorLength, scaling.layer0CorridorRow);
         }
         else
         {
@@ -97,7 +119,11 @@ public class GameManager : MonoBehaviour
 
         SpawnOrMovePlayer();
         SpawnEnemies(rooms.Count);
+        SpawnBoss(rooms.Count);
         SpawnItems(rooms.Count);
+        SpawnChests(rooms.Count);
+        SpawnTutorialSign();
+        SpawnFloorTestFixtures(rooms.Count);
 
         OnFloorChanged?.Invoke(CurrentFloor);
     }
@@ -120,6 +146,18 @@ public class GameManager : MonoBehaviour
             if (enemy != null) Destroy(enemy.gameObject);
         }
         spawnedEnemies.Clear();
+
+        foreach (SignPost sign in spawnedSigns)
+        {
+            if (sign != null) Destroy(sign.gameObject);
+        }
+        spawnedSigns.Clear();
+
+        foreach (LootChest chest in spawnedChests)
+        {
+            if (chest != null) Destroy(chest.gameObject);
+        }
+        spawnedChests.Clear();
     }
 
     private void SpawnOrMovePlayer()
@@ -197,6 +235,8 @@ public class GameManager : MonoBehaviour
 
                 EnemyController enemy = Instantiate(enemyPrefab);
                 enemy.ApplyStatBonus(floorBonus);
+                ApplyEarlyFloorHealthScaling(enemy);
+                ApplyEarlyFloorAttackScaling(enemy);
                 enemy.SetGoldFloorBonus(goldFloorBonus);
                 enemy.SpawnAt(spawnCell);
                 enemy.OnDeath += HandleEnemyDeath;
@@ -214,6 +254,8 @@ public class GameManager : MonoBehaviour
             {
                 EnemyController enemy = Instantiate(enemyPrefab);
                 enemy.ApplyStatBonus(floorBonus);
+                ApplyEarlyFloorHealthScaling(enemy);
+                ApplyEarlyFloorAttackScaling(enemy);
                 enemy.SetGoldFloorBonus(goldFloorBonus);
                 enemy.SpawnAt(fallbackCell);
                 enemy.OnDeath += HandleEnemyDeath;
@@ -225,6 +267,84 @@ public class GameManager : MonoBehaviour
                 Debug.LogError($"GameManager: floor {CurrentFloor} has no enemies and no free fallback cell - the run cannot advance.");
             }
         }
+    }
+
+    /// <summary>Floors 1-5 only: scales an already-spawned enemy's maxHp up
+    /// exponentially by floor (FloorScalingConfig.earlyFloorHealthGrowthRate^(floor-1)),
+    /// on top of whatever floorBonus already applied - a deliberate felt-difficulty
+    /// ramp for the tutorial floors, requested on top of Layer 0's normal flat
+    /// scaling (CLAUDE.md rule 5: surfaced here, not silently folded into
+    /// LayerAwareFloorStep's existing "no scaling" formula).</summary>
+    private void ApplyEarlyFloorHealthScaling(EnemyController enemy)
+    {
+        if (CurrentFloor < 1 || CurrentFloor > 5) return;
+
+        float multiplier = Mathf.Pow(scaling.earlyFloorHealthGrowthRate, CurrentFloor - 1);
+        if (multiplier <= 1f) return;
+
+        int extraHp = Mathf.RoundToInt(enemy.Stats.maxHp * (multiplier - 1f));
+        enemy.ApplyStatBonus(new Stats { maxHp = extraHp });
+    }
+
+    /// <summary>Floors 1-5 only: same exponential-ramp mechanism as
+    /// ApplyEarlyFloorHealthScaling, applied to attack instead of maxHp -
+    /// requested as a follow-up 2026-08-06 so damage keeps pace with the HP
+    /// curve instead of staying flat through Layer 0.</summary>
+    private void ApplyEarlyFloorAttackScaling(EnemyController enemy)
+    {
+        if (CurrentFloor < 1 || CurrentFloor > 5) return;
+
+        float multiplier = Mathf.Pow(scaling.earlyFloorAttackGrowthRate, CurrentFloor - 1);
+        if (multiplier <= 1f) return;
+
+        int extraAttack = Mathf.RoundToInt(enemy.Stats.attack * (multiplier - 1f));
+        enemy.ApplyStatBonus(new Stats { attack = extraAttack });
+    }
+
+    /// <summary>Floor 5's mini-boss (LAYERS.md -> "Boss stat & loot multipliers",
+    /// "Mini (floor 5)" as a base, overridden to 3x max HP / 2x ATK per explicit
+    /// request 2026-08-06 - stronger than LAYERS.md's documented 2x/+50% baseline).
+    /// One extra enemy in the last room, boosted via the same EnemyController/
+    /// LootTable machinery every other enemy uses - no dedicated boss class/
+    /// prefab/sprite, CLAUDE.md rule 6 ("no speculative abstraction"). This is the
+    /// stat/loot half of LAYERS.md's design only - ROADMAP.md's separate "Boss
+    /// with telegraphed attacks" scripted-behavior system is unbuilt and
+    /// explicitly out of scope here. Loot's slotChanceMultiplier (3.7) approximates
+    /// "13 slots" by scaling the existing 10 (10 x 3.7 gives ~1.152 x 3.7 ≈ 4.26
+    /// expected items/kill, matching LAYERS.md's ~4.25 target) rather than
+    /// inventing 3 new undocumented per-slot percentages - unchanged by this
+    /// stat-multiplier bump.</summary>
+    private void SpawnBoss(int roomCount)
+    {
+        if (enemyPrefab == null || CurrentFloor != 5 || roomCount == 0) return;
+
+        Vector2Int cell = dungeonGenerator.RoomCenter(roomCount - 1);
+        if (DungeonGrid.IsOccupied(cell)) return;
+
+        EnemyController boss = Instantiate(enemyPrefab);
+        boss.SpawnAt(cell);
+        // Boss gets the same floor-5 exponential health/attack curves every plain
+        // enemy on this floor gets FIRST, so "3x"/"2x" below mean 3x/2x an actual
+        // floor-5 enemy's stats (30hp/6atk -> 90hp/12atk), not 3x/2x the boss's own
+        // unscaled prefab base - same reasoning for both stats, 2026-08-06.
+        ApplyEarlyFloorHealthScaling(boss);
+        ApplyEarlyFloorAttackScaling(boss);
+
+        Stats current = boss.Stats;
+        var bossBonus = new Stats
+        {
+            maxHp = current.maxHp * 2,  // +200% on top of current = 3x total
+            attack = current.attack,    // +100% on top of current = 2x total
+        };
+        boss.ApplyStatBonus(bossBonus);
+        boss.SetLootBonus(3.7f, 2f, guaranteesMinRarity: true, guaranteedMinRarity: Rarity.Uncommon);
+
+        // No dedicated boss sprite yet - a visible "this one's bigger" cue in the
+        // meantime, same hand-tuned-placeholder spirit as the chest sprites.
+        boss.transform.localScale *= 1.5f;
+
+        boss.OnDeath += HandleEnemyDeath;
+        spawnedEnemies.Add(boss);
     }
 
     private void SpawnItems(int roomCount)
@@ -241,6 +361,148 @@ public class GameManager : MonoBehaviour
             HealthPotionPickup item = Instantiate(itemPrefab);
             item.transform.position = GridUtils.CellToWorld(spawnCell);
             spawnedItems.Add(item);
+        }
+    }
+
+    /// <summary>
+    /// Layer 0's welcome sign - floor 1 only, placed directly beside the player's
+    /// actual spawn cell (not a fixed absolute cell, so it stays adjacent regardless
+    /// of room size/shape tuning). Not a general per-floor sign system yet -
+    /// ROADMAP.md doesn't define one, this is a single hand-placed hint, same
+    /// "hardcode until a real design exists" spirit as EnemyController's per-type
+    /// xpReward/goldReward.
+    /// </summary>
+    private void SpawnTutorialSign()
+    {
+        if (signPrefab == null || CurrentFloor != 1) return;
+
+        Vector2Int cell = dungeonGenerator.RoomCenter(0) + new Vector2Int(1, 0);
+        if (DungeonGrid.IsOccupied(cell) || DungeonGrid.HasItem(cell) || DungeonGrid.GetInteractable(cell) != null) return;
+
+        SignPost sign = Instantiate(signPrefab);
+        sign.transform.position = GridUtils.CellToWorld(cell);
+        spawnedSigns.Add(sign);
+    }
+
+    private void SpawnChests(int roomCount)
+    {
+        // First 5 floors only ever get the hand-placed test fixtures below
+        // (floor 2's chest, floor 3's special one) - the random roll resumes
+        // from floor 6 onward (explicit one-off request, 2026-08-06).
+        if (CurrentFloor <= 5) return;
+        if (smallChestPrefab == null && largeChestPrefab == null) return;
+
+        for (int roomIndex = 0; roomIndex < roomCount; roomIndex++)
+        {
+            if (UnityEngine.Random.value > scaling.chestSpawnChance) continue;
+
+            LootChest prefab = ChooseChestPrefab();
+            if (prefab == null) continue;
+
+            // Origin is the footprint's bottom-left cell (matches LootChest's own
+            // doc comment) - RandomCellInRoom only guarantees THIS cell is inside
+            // the room, so a footprint wider than 1x1 still needs every extra cell
+            // validated below before committing to this placement.
+            Vector2Int origin = dungeonGenerator.RandomCellInRoom(roomIndex);
+            if (!CanPlaceFootprint(origin, prefab.Footprint)) continue;
+
+            LootChest chest = Instantiate(prefab);
+            chest.transform.position = GridUtils.CellToWorld(origin);
+            spawnedChests.Add(chest);
+        }
+    }
+
+    /// <summary>Picks small or large per scaling.largeChestChance, falling back to
+    /// whichever prefab is actually assigned if only one is.</summary>
+    private LootChest ChooseChestPrefab()
+    {
+        bool wantsLarge = UnityEngine.Random.value < scaling.largeChestChance;
+        if (wantsLarge && largeChestPrefab != null) return largeChestPrefab;
+        return smallChestPrefab != null ? smallChestPrefab : largeChestPrefab;
+    }
+
+    /// <summary>True only if every cell in the footprint (not just origin) is
+    /// walkable floor with nothing already on it - a footprint wider than 1x1 can
+    /// otherwise have its far cell land in a wall or on top of something else.</summary>
+    private bool CanPlaceFootprint(Vector2Int origin, Vector2Int footprint)
+    {
+        for (int x = 0; x < footprint.x; x++)
+        {
+            for (int y = 0; y < footprint.y; y++)
+            {
+                Vector2Int cell = origin + new Vector2Int(x, y);
+                if (!DungeonGrid.IsWalkable(cell)) return false;
+                if (DungeonGrid.IsOccupied(cell) || DungeonGrid.HasItem(cell) || DungeonGrid.GetInteractable(cell) != null) return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Test-purpose fixtures (explicit one-off request, 2026-08-06): floor 2 gets a
+    /// sign explaining chests plus a small chest, floor 3 gets a sign explaining the
+    /// special chest plus the special chest itself (both guaranteed, on top of
+    /// whatever SpawnChests' normal roll would also produce - floors 1-5 never roll
+    /// randomly, see SpawnChests, so these two floors are the only chests before
+    /// floor 6), floor 4 gets a sign only (no chest - SpawnFixture's chest
+    /// placement is a no-op when passed null) explaining the bag/character menu and
+    /// how to equip gear. Same "hardcode a one-off, don't build a system" spirit as
+    /// SpawnTutorialSign; the shared shape (sign in room 0, chest in room 1) lives
+    /// in SpawnFixture below instead of being duplicated per floor.
+    /// </summary>
+    private void SpawnFloorTestFixtures(int roomCount)
+    {
+        if (CurrentFloor == 2)
+        {
+            SpawnFixture(roomCount,
+                "Chests hold gold and gear. Walk up to one and press E to open it. " +
+                "Large chests (two tiles wide) have better odds and rarer loot than small ones.",
+                smallChestPrefab != null ? smallChestPrefab : largeChestPrefab);
+        }
+        else if (CurrentFloor == 3)
+        {
+            SpawnFixture(roomCount,
+                "This chest is special - it always contains at least one Rare item or " +
+                "better, has better odds for everything else too, and holds far more " +
+                "gold than an ordinary chest.",
+                specialChestPrefab);
+        }
+        else if (CurrentFloor == 4)
+        {
+            SpawnFixture(roomCount,
+                "Press B to open your bag, or C for your character menu - both show " +
+                "your inventory and equipped gear together. To equip an item, drag it " +
+                "from the bag onto its matching slot, or right-click it and press Equip.",
+                null);
+        }
+    }
+
+    /// <summary>Places one hand-picked sign (room 0, explaining signMessage) + one
+    /// chest (room 1, chestPrefab) pair - the shared shape behind both of
+    /// SpawnFloorTestFixtures' floors.</summary>
+    private void SpawnFixture(int roomCount, string signMessage, LootChest chestPrefab)
+    {
+        if (signPrefab != null)
+        {
+            Vector2Int signCell = dungeonGenerator.RoomCenter(0) + new Vector2Int(1, 0);
+            if (!DungeonGrid.IsOccupied(signCell) && !DungeonGrid.HasItem(signCell) && DungeonGrid.GetInteractable(signCell) == null)
+            {
+                SignPost sign = Instantiate(signPrefab);
+                sign.SetMessage(signMessage);
+                sign.transform.position = GridUtils.CellToWorld(signCell);
+                spawnedSigns.Add(sign);
+            }
+        }
+
+        if (chestPrefab != null && roomCount > 1)
+        {
+            Vector2Int chestOrigin = dungeonGenerator.RoomCenter(1);
+            if (CanPlaceFootprint(chestOrigin, chestPrefab.Footprint))
+            {
+                LootChest chest = Instantiate(chestPrefab);
+                chest.transform.position = GridUtils.CellToWorld(chestOrigin);
+                spawnedChests.Add(chest);
+            }
         }
     }
 

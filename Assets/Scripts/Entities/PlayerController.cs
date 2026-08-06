@@ -1,17 +1,22 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
 
 /// <summary>
 /// Click-to-move only - no WASD/arrow keys. A click plans a route once
 /// (Pathfinder.FindPath) and the player walks it one cell per turn. Clicking
-/// directly on an enemy is a valid target - DungeonGrid.IsWalkable is terrain-only
-/// and doesn't care about occupancy - and the walk never has to step onto its cell,
-/// because coming within BattleManager.EngageRange opens the battle screen first.
-/// Each step still resolves through the same TryAct as before: move into an empty
-/// walkable cell, or attack per the equipped weapon's pattern (ROADMAP.md ->
-/// "Weapon-driven attack patterns").
+/// directly on an enemy or an IInteractable (SignPost, LootChest) is a valid
+/// target - DungeonGrid.IsWalkable is terrain-only and doesn't care about
+/// occupancy, and neither ever needs the player to actually step onto its cell:
+/// coming within BattleManager.EngageRange opens the battle screen automatically,
+/// while an interactable only ever shows a "{Verb} (E)" prompt (InteractionPromptUI)
+/// when within its InteractRange - ambient, not tied to having clicked it - and
+/// Interact() itself only fires on an explicit E press while that prompt is up.
+/// Two-step by design: unlike combat, merely walking near/through an interactable
+/// on the way somewhere else should never fire its action, but the prompt itself
+/// is harmless to show ambiently. Each step still resolves through the same
+/// TryAct as before: move into an empty walkable cell, or attack per the equipped
+/// weapon's pattern (ROADMAP.md -> "Weapon-driven attack patterns").
 /// </summary>
 [RequireComponent(typeof(Entity))]
 public class PlayerController : Entity
@@ -30,8 +35,23 @@ public class PlayerController : Entity
         // were still acting - which is most of the time during a walk.
         if (Input.GetMouseButtonDown(0)) BufferClick();
 
+        // Ambient, not gated on whose turn it is or on having clicked the
+        // interactable - the prompt is a passive hint (harmless to show any time)
+        // and interacting spends no turn, same spirit as signs' original "reading
+        // costs nothing" design, now shared by every IInteractable. Suppressed only
+        // during an active battle, so E doesn't do anything unexpected while the
+        // battle screen owns input.
+        bool inBattle = BattleManager.Instance != null && BattleManager.Instance.IsActive;
+        IInteractable nearbyInteractable = inBattle ? null : FindNearbyInteractable();
+        if (nearbyInteractable != null) InteractionPromptUI.Instance.Show(nearbyInteractable.PromptLabel);
+        else InteractionPromptUI.Instance.Hide();
+        if (nearbyInteractable != null && Input.GetKeyDown(KeyCode.E))
+        {
+            nearbyInteractable.Interact(this);
+        }
+
         if (TurnManager.Instance == null || TurnManager.Instance.State != TurnState.PlayerTurn) return;
-        if (BattleManager.Instance != null && BattleManager.Instance.IsActive)
+        if (inBattle)
         {
             // An enemy can also open the battle screen on its own turn (EnemyController.TakeTurn)
             // mid-route - that path never touches PlayerController, so without this the stale
@@ -50,6 +70,26 @@ public class PlayerController : Entity
         if (autoWalkPath.Count > 0) ContinueAutoWalk();
     }
 
+    /// <summary>The nearest registered interactable within its own InteractRange of
+    /// the player's current cell, or null. Ambient - checked every frame regardless of
+    /// movement or clicks, since showing the prompt has no side effect; only pressing
+    /// E does.</summary>
+    private IInteractable FindNearbyInteractable()
+    {
+        // Checks every cell a multi-tile fixture (e.g. a 2-wide LootChest) occupies,
+        // not just one anchor point, so the prompt appears at InteractRange from
+        // whichever side the player actually approaches from.
+        foreach (IInteractable interactable in DungeonGrid.Interactables)
+        {
+            if (interactable == null) continue;
+            foreach (Vector2Int cell in interactable.Cells)
+            {
+                if (GridUtils.WithinRange(Cell, cell, interactable.InteractRange)) return interactable;
+            }
+        }
+        return null;
+    }
+
     private void StopAutoWalk()
     {
         autoWalkPath.Clear();
@@ -59,45 +99,35 @@ public class PlayerController : Entity
     /// <summary>Resolves the click to a cell immediately, even if it can't be acted on
     /// until the enemy phase ends. Converting now (not when the turn comes around) is
     /// deliberate: the camera follows the player, so a later conversion of the same
-    /// screen point would name whatever cell had slid under the cursor by then.</summary>
+    /// screen point would name whatever cell had slid under the cursor by then.
+    ///
+    /// EventSystem.IsPointerOverGameObject() blocks on ANY raycastTarget=true hit, not
+    /// just interactive controls - which is exactly what's needed here, since the
+    /// battle screen's Backdrop and the equipment panel's background are plain, non-
+    /// interactive Images deliberately left raycastTarget=true so they cover the map
+    /// underneath. (An earlier version of this method narrowed the check to Selectable
+    /// only, which fixed an invisible-label click-blocking bug but broke this - a click
+    /// on empty space inside an open panel leaked through, queuing a map-walk that fired
+    /// the instant the panel closed. Reverted.) The actual fix for that original bug is
+    /// in the scene: every purely decorative HUD graphic (labels, fills, icons) has
+    /// raycastTarget off, so only real controls and deliberate modal backdrops remain
+    /// raycastable - keep new UI elements to that same rule instead of narrowing this
+    /// check again.</summary>
     private void BufferClick()
     {
-        if (IsPointerOverBlockingUI()) return; // clicked UI, not the map
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return; // clicked UI, not the map
         if (Camera.main == null) return;
 
         Vector2Int cell = GridUtils.WorldToCell(Camera.main.ScreenToWorldPoint(Input.mousePosition));
-        if (!DungeonGrid.IsWalkable(cell)) return; // clicked a wall — same as walking into one, not a valid target
+
+        // An interactable's own cell fails IsWalkable (it marks itself solid on Start),
+        // but it's still a valid click target - same exception Pathfinder.Search itself
+        // makes for the goal cell. Checked before the wall rejection below so clicking
+        // directly on one isn't mistaken for clicking a wall.
+        bool isInteractableCell = DungeonGrid.GetInteractable(cell) != null;
+        if (!isInteractableCell && !DungeonGrid.IsWalkable(cell)) return; // clicked a wall — same as walking into one, not a valid target
 
         pendingClickCell = cell;
-    }
-
-    /// <summary>
-    /// True only if the pointer is over UI the player could actually interact with.
-    /// EventSystem.IsPointerOverGameObject() alone is NOT enough: Unity defaults every
-    /// Text/Image to raycastTarget = true, and the raycaster hit-tests the whole
-    /// RectTransform, not the visible glyphs - so a HUD label (even an empty one, like
-    /// GameOverText sitting invisible in the center of the screen) silently swallowed
-    /// every map click inside its 600x100 rect. That reads as "the game randomly won't
-    /// move," and because the camera follows the player, the dead zone is fixed to the
-    /// screen while sliding over the world, so it looks intermittent rather than
-    /// positional. The scene's labels have raycastTarget off now; this filter is the
-    /// guard that keeps the next added label from resurrecting the bug.
-    /// </summary>
-    private static bool IsPointerOverBlockingUI()
-    {
-        if (EventSystem.current == null) return false;
-
-        var pointer = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
-        var hits = new List<RaycastResult>();
-        EventSystem.current.RaycastAll(pointer, hits);
-
-        foreach (RaycastResult hit in hits)
-        {
-            // A Selectable (Button/Slider/...) is a real control; anything else under
-            // the cursor is decoration that shouldn't consume a click meant for the map.
-            if (hit.gameObject.GetComponentInParent<Selectable>() != null) return true;
-        }
-        return false;
     }
 
     private void StartAutoWalk(Vector2Int goal)
