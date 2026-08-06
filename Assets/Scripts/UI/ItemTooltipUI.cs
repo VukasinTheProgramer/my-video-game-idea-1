@@ -148,7 +148,6 @@ public class ItemTooltipUI : MonoBehaviour
         Stats s = item.bonusStats ?? new Stats();
         var lines = new System.Text.StringBuilder();
         lines.Append($"{item.slot} - Item Level {item.itemLevel}\n");
-        if (item.weaponDamage != 0) lines.Append($"Weapon Damage: {item.weaponDamage}\n");
         if (s.attack != 0) lines.Append($"Attack: +{s.attack}\n");
         if (s.agility != 0) lines.Append($"Agility: +{s.agility}\n");
         if (s.magic != 0) lines.Append($"Magic: +{s.magic}\n");

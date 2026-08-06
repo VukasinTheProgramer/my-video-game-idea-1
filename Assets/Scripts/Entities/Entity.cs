@@ -35,9 +35,6 @@ public class Entity : MonoBehaviour
     /// or MainHand is empty.</summary>
     public virtual WeaponType EquippedWeaponType => equipment != null ? equipment.EquippedWeaponType : WeaponType.None;
 
-    /// <summary>Flat weapon damage from the equipped MainHand item (§2). 0 if unarmed.</summary>
-    public virtual int WeaponDamage => equipment != null ? equipment.WeaponDamage : 0;
-
     public Vector2Int Cell { get; protected set; }
     public bool IsDead { get; protected set; }
 
@@ -158,12 +155,14 @@ public class Entity : MonoBehaviour
         slideRoutine = null;
     }
 
-    public virtual void Attack(Entity target)
+    /// <summary>damageMultiplier passes through to CombatResolver.Resolve - see there
+    /// for why (ROADMAP.md -> "Weapon-driven attack patterns", Axe cleave).</summary>
+    public virtual void Attack(Entity target, float damageMultiplier = 1f)
     {
         Face(target.Cell - Cell); // swing toward the target, not wherever we last walked
         if (directionalAnimator != null) directionalAnimator.PlayAttack();
 
-        CombatResult result = CombatResolver.Resolve(this, target);
+        CombatResult result = CombatResolver.Resolve(this, target, damageMultiplier);
         OnAttackResolved?.Invoke(this, target, result);
         DamageNumberSpawner.Instance.ShowAttackResult(target, result);
         // IMPLEMENTED.md -> "Combat feedback": crits get a small screen shake. Called directly for

@@ -32,7 +32,11 @@ public readonly struct CombatResult
 /// </summary>
 public static class CombatResolver
 {
-    public static CombatResult Resolve(Entity attacker, Entity defender)
+    /// <summary>damageMultiplier scales rawDamage before defense/crit/life-steal are
+    /// applied - e.g. Axe cleave's secondary targets (ROADMAP.md -> "Weapon-driven
+    /// attack patterns", AttackPatternResolver.AxeCleaveSecondaryMultiplier). 1 for
+    /// every existing caller, so this is a no-op for all pre-existing combat.</summary>
+    public static CombatResult Resolve(Entity attacker, Entity defender, float damageMultiplier = 1f)
     {
         Stats atk = attacker.Stats;
         Stats def = defender.Stats;
@@ -42,7 +46,7 @@ public static class CombatResolver
         int defenseStat = DefenseStatFor(weapon, def);
 
         int variance = Random.Range(-1, 2); // -1, 0, or 1
-        int rawDamage = scalingStat + attacker.WeaponDamage + variance;
+        int rawDamage = Mathf.RoundToInt((scalingStat + variance) * damageMultiplier);
 
         float dodgeChance = EffectiveDodgeChance(def);
         bool dodged = Roll(dodgeChance);

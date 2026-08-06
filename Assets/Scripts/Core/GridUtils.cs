@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -41,5 +42,24 @@ public static class GridUtils
     public static bool WithinRange(Vector2Int a, Vector2Int b, int range)
     {
         return ManhattanDistance(a, b) <= range;
+    }
+
+    /// <summary>Every cell at exactly Chebyshev distance `radius` from center - the
+    /// perimeter of a (2*radius+1) square, corners included (diagonals are valid
+    /// "nearby free floor" even though movement itself is cardinal-only). Used by
+    /// ItemPickup's spiral scatter search when a drop's own cell is already taken
+    /// (ROADMAP.md -> "Multi-drop loot rolls"). radius must be >= 1.</summary>
+    public static IEnumerable<Vector2Int> RingCells(Vector2Int center, int radius)
+    {
+        for (int x = -radius; x <= radius; x++)
+        {
+            yield return center + new Vector2Int(x, radius);
+            yield return center + new Vector2Int(x, -radius);
+        }
+        for (int y = -radius + 1; y <= radius - 1; y++)
+        {
+            yield return center + new Vector2Int(radius, y);
+            yield return center + new Vector2Int(-radius, y);
+        }
     }
 }

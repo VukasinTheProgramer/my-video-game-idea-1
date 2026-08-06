@@ -166,10 +166,17 @@ public class EnemyController : Entity
     {
         if (lootTable != null)
         {
-            EquippableItem drop = lootTable.RollDrop();
-            if (drop != null)
+            // Every drop spawns at the same death cell - ItemPickup.Start()'s own
+            // spiral scatter search (widened for this, ROADMAP.md -> "Multi-drop
+            // loot rolls") handles fanning simultaneous drops out to nearby free
+            // cells, so this loop doesn't need its own placement logic.
+            foreach (EquippableItem drop in lootTable.RollDrops())
             {
-                ItemPickup pickup = EquipmentDropPickup.SpawnAt(Cell, drop);
+                // floorStep 0 - items never had per-floor scaling before this, so
+                // there's nothing to gate; stays off until Layer 1 exists
+                // (IMPLEMENTED.md -> "Item generation").
+                EquippableItem generated = ItemGenerator.Generate(drop, 0, drop.rarity);
+                ItemPickup pickup = EquipmentDropPickup.SpawnAt(Cell, generated);
                 OnLootDropped?.Invoke(pickup);
             }
         }

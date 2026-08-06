@@ -46,6 +46,16 @@ public class EquipmentPanelUI : MonoBehaviour
 
     private readonly List<ItemSlotUI> bagSlotPool = new List<ItemSlotUI>();
 
+    // Bound once via GameManager.OnPlayerSpawned (CLAUDE.md -> "UI binds to
+    // the player once, via an event") - the player is created once by
+    // GameManager and only ever moved between floors, so this identity never
+    // changes and never needs re-resolving per call.
+    private PlayerController boundPlayer;
+    private Equipment boundEquipment;
+    private Inventory boundInventory;
+    private PlayerProgression boundProgression;
+    private Wallet boundWallet;
+
     private PlayerController subscribedPlayer;
     private Inventory subscribedInventory;
     private PlayerProgression subscribedProgression;
@@ -75,15 +85,27 @@ public class EquipmentPanelUI : MonoBehaviour
     private void Start()
     {
         panelRoot.SetActive(false);
+
+        // Bind through GameManager (its Awake always precedes any Start) rather
+        // than FindObjectOfType here - the player may not exist yet at this point.
+        if (GameManager.Instance == null) return;
+
+        if (GameManager.Instance.Player != null) Bind(GameManager.Instance.Player);
+        else GameManager.Instance.OnPlayerSpawned += Bind;
+    }
+
+    private void Bind(PlayerController player)
+    {
+        boundPlayer = player;
+        boundEquipment = player.GetComponent<Equipment>();
+        boundInventory = player.GetComponent<Inventory>();
+        boundProgression = player.GetComponent<PlayerProgression>();
+        boundWallet = player.GetComponent<Wallet>();
     }
 
     private void SpendPoint(PlayerProgression.AllocatableStat stat)
     {
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
-        if (player == null) return;
-
-        PlayerProgression progression = player.GetComponent<PlayerProgression>();
-        if (progression != null && progression.TrySpendPoint(stat)) Refresh();
+        if (boundProgression != null && boundProgression.TrySpendPoint(stat)) Refresh();
     }
 
     public void TogglePanel()
@@ -112,20 +134,19 @@ public class EquipmentPanelUI : MonoBehaviour
     {
         Unsubscribe(); // never stack handlers across repeated opens
 
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
-        if (player == null) return;
+        if (boundPlayer == null) return;
 
-        subscribedPlayer = player;
+        subscribedPlayer = boundPlayer;
         subscribedPlayer.OnHealthChanged += HandleHealthChanged;
 
-        subscribedInventory = player.GetComponent<Inventory>();
+        subscribedInventory = boundInventory;
         if (subscribedInventory != null)
         {
             subscribedInventory.OnItemAdded += HandleBagChanged;
             subscribedInventory.OnItemRemoved += HandleBagChanged;
         }
 
-        subscribedProgression = player.GetComponent<PlayerProgression>();
+        subscribedProgression = boundProgression;
         if (subscribedProgression != null)
         {
             subscribedProgression.OnXPChanged += HandleProgressionXPChanged;
@@ -172,17 +193,10 @@ public class EquipmentPanelUI : MonoBehaviour
     /// </summary>
     public void EquipFromBag(EquippableItem item)
     {
-        if (item == null) return;
+        if (item == null || boundInventory == null || boundEquipment == null) return;
+        if (!boundInventory.Items.Contains(item)) return; // already equipped or gone
 
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
-        if (player == null) return;
-
-        Inventory inventory = player.GetComponent<Inventory>();
-        Equipment equipment = player.GetComponent<Equipment>();
-        if (inventory == null || equipment == null) return;
-        if (!inventory.Items.Contains(item)) return; // already equipped or gone
-
-        equipment.Equip(item.slot, item);
+        boundEquipment.Equip(item.slot, item);
         Refresh();
     }
 
@@ -195,33 +209,22 @@ public class EquipmentPanelUI : MonoBehaviour
     /// template other drops still reference, never destroyed.</summary>
     public void SellFromBag(EquippableItem item)
     {
-        if (item == null) return;
-
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
-        if (player == null) return;
-
-        Inventory inventory = player.GetComponent<Inventory>();
-        Wallet wallet = player.GetComponent<Wallet>();
-        if (inventory == null || wallet == null) return;
-        if (!inventory.Items.Contains(item)) return; // already sold/equipped/gone
+        if (item == null || boundInventory == null || boundWallet == null) return;
+        if (!boundInventory.Items.Contains(item)) return; // already sold/equipped/gone
 
         int value = ItemPricing.SellValue(item);
-        inventory.Remove(item);
-        wallet.AddGold(value);
+        boundInventory.Remove(item);
+        boundWallet.AddGold(value);
         Refresh();
     }
 
     /// <summary>Sends whatever's in this slot back to the bag.</summary>
     public void UnequipSlot(int slotOrderIndex)
     {
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
-        if (player == null) return;
-
-        Equipment equipment = player.GetComponent<Equipment>();
-        if (equipment == null) return;
+        if (boundEquipment == null) return;
         if (slotOrderIndex < 0 || slotOrderIndex >= SlotOrder.Length) return;
 
-        equipment.Unequip(SlotOrder[slotOrderIndex]);
+        boundEquipment.Unequip(SlotOrder[slotOrderIndex]);
         Refresh();
     }
 
@@ -231,16 +234,10 @@ public class EquipmentPanelUI : MonoBehaviour
     /// isn't actually equipped (e.g. dropped a bag item onto the bag).</summary>
     private void UnequipItem(EquippableItem item)
     {
-        if (item == null) return;
+        if (item == null || boundEquipment == null) return;
+        if (boundEquipment.GetEquipped(item.slot) != item) return; // not actually the equipped item in that slot
 
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
-        if (player == null) return;
-
-        Equipment equipment = player.GetComponent<Equipment>();
-        if (equipment == null) return;
-        if (equipment.GetEquipped(item.slot) != item) return; // not actually the equipped item in that slot
-
-        equipment.Unequip(item.slot);
+        boundEquipment.Unequip(item.slot);
         Refresh();
     }
 
@@ -262,43 +259,30 @@ public class EquipmentPanelUI : MonoBehaviour
     /// <summary>Sorts the bag by rarity, highest first. Wire a "Sort by Rarity" Button to this.</summary>
     public void SortBagByRarity()
     {
-        GetPlayerInventory()?.SortByRarity();
+        boundInventory?.SortByRarity();
         Refresh();
     }
 
     /// <summary>Sorts the bag by item level, highest first. Wire a "Sort by Level" Button to this.</summary>
     public void SortBagByItemLevel()
     {
-        GetPlayerInventory()?.SortByItemLevel();
+        boundInventory?.SortByItemLevel();
         Refresh();
-    }
-
-    private Inventory GetPlayerInventory()
-    {
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
-        return player != null ? player.GetComponent<Inventory>() : null;
     }
 
     private void Refresh()
     {
-        // Looked up fresh on open, not cached at Start() - the player is spawned
-        // by GameManager.Start(), whose ordering relative to this Start() isn't
-        // guaranteed within the same frame.
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.Player : null;
-        if (player == null) return;
-
-        Equipment equipment = player.GetComponent<Equipment>();
-        if (equipment == null) return;
+        if (boundPlayer == null || boundEquipment == null) return;
 
         // Anything the tooltip was describing may have just moved slots.
         tooltip?.Hide();
 
-        RefreshStats(player);
-        RefreshProgression(player);
+        RefreshStats();
+        RefreshProgression();
 
         for (int i = 0; i < SlotOrder.Length; i++)
         {
-            EquippableItem item = equipment.GetEquipped(SlotOrder[i]);
+            EquippableItem item = boundEquipment.GetEquipped(SlotOrder[i]);
             int slotIndex = i; // capture for the closure below
 
             if (slotUIs != null && i < slotUIs.Length && slotUIs[i] != null)
@@ -313,7 +297,7 @@ public class EquipmentPanelUI : MonoBehaviour
             }
         }
 
-        RefreshBag(player);
+        RefreshBag();
     }
 
     /// <summary>
@@ -321,15 +305,15 @@ public class EquipmentPanelUI : MonoBehaviour
     /// formulas (not a re-derived copy) so this always matches what combat
     /// actually rolls against - see CombatResolver's public Effective* methods.
     /// </summary>
-    private void RefreshStats(PlayerController player)
+    private void RefreshStats()
     {
-        if (statsText == null) return;
+        if (statsText == null || boundPlayer == null) return;
 
-        Stats stats = player.Stats;
-        bool canParry = CombatResolver.CanParry(player.EquippedWeaponType);
+        Stats stats = boundPlayer.Stats;
+        bool canParry = CombatResolver.CanParry(boundPlayer.EquippedWeaponType);
 
         statsText.text =
-            $"HP: {player.CurrentHealth} / {stats.maxHp}\n" +
+            $"HP: {boundPlayer.CurrentHealth} / {stats.maxHp}\n" +
             "\n" +
             $"Attack: {stats.attack}\n" +
             $"Agility: {stats.agility}\n" +
@@ -347,33 +331,31 @@ public class EquipmentPanelUI : MonoBehaviour
     /// <summary>Level/XP readout plus the Attack/Health/Agility point-spend buttons
     /// (IMPLEMENTED.md -> "Leveling & stat points") - buttons only enable while
     /// points are available; spending is permanent, there's no respec.</summary>
-    private void RefreshProgression(PlayerController player)
+    private void RefreshProgression()
     {
-        PlayerProgression progression = player.GetComponent<PlayerProgression>();
-        if (progression == null) return;
+        if (boundProgression == null) return;
 
         if (progressionText != null)
         {
-            progressionText.text = $"Level {progression.Level}   XP {progression.CurrentXP} / {progression.XPToNextLevel}";
+            progressionText.text = $"Level {boundProgression.Level}   XP {boundProgression.CurrentXP} / {boundProgression.XPToNextLevel}";
         }
 
         if (availablePointsText != null)
         {
-            availablePointsText.text = $"Points available: {progression.AvailableStatPoints}";
+            availablePointsText.text = $"Points available: {boundProgression.AvailableStatPoints}";
         }
 
-        bool hasPoints = progression.AvailableStatPoints > 0;
+        bool hasPoints = boundProgression.AvailableStatPoints > 0;
         if (attackPointButton != null) attackPointButton.interactable = hasPoints;
         if (healthPointButton != null) healthPointButton.interactable = hasPoints;
         if (agilityPointButton != null) agilityPointButton.interactable = hasPoints;
     }
 
-    private void RefreshBag(PlayerController player)
+    private void RefreshBag()
     {
         if (bagSlotContainer == null) return;
 
-        Inventory inventory = player.GetComponent<Inventory>();
-        IReadOnlyList<EquippableItem> items = inventory != null ? inventory.Items : System.Array.Empty<EquippableItem>();
+        IReadOnlyList<EquippableItem> items = boundInventory != null ? boundInventory.Items : System.Array.Empty<EquippableItem>();
 
         EnsureBagPoolSize(items.Count);
 

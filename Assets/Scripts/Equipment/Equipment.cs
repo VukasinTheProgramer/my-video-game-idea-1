@@ -127,9 +127,6 @@ public class Equipment : MonoBehaviour
     /// <summary>Weapon family of whatever's in MainHand, or None if empty/unarmed (CombatResolver, §1/§4).</summary>
     public WeaponType EquippedWeaponType => GetEquipped(EquipmentSlot.MainHand)?.weaponType ?? WeaponType.None;
 
-    /// <summary>Flat weapon damage from MainHand (§2), 0 if empty.</summary>
-    public int WeaponDamage => GetEquipped(EquipmentSlot.MainHand)?.weaponDamage ?? 0;
-
     /// <summary>Called by DirectionalSpriteAnimator every time the base body's own sprite changes.</summary>
     public void ApplyFrame(Vector2Int direction, AnimAction action, int frameIndex)
     {

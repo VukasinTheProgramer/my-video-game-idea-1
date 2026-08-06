@@ -7,25 +7,35 @@ using UnityEngine;
 /// </summary>
 public abstract class ItemPickup : MonoBehaviour
 {
+    // A kill can drop up to 10 items at once (ROADMAP.md -> "Multi-drop loot
+    // rolls") landing on the same cell in the same frame - each one's Start()
+    // runs in turn, so a single ring (radius 1, 4 cells) fills up fast, especially
+    // in a tight corridor. 6 rings covers a 13x13 area, comfortably more cells
+    // than one kill can ever fill.
+    private const int MaxScatterRadius = 6;
+
     protected virtual void Start()
     {
         Vector2Int cell = GridUtils.WorldToCell(transform.position);
         if (DungeonGrid.PlaceItem(cell, this)) return;
 
-        // Cell already holds an item (an enemy died on top of a potion, say).
-        // Overwriting would leave the first item visible but unreachable, so step
-        // to an adjacent free cell instead.
-        foreach (Vector2Int direction in GridUtils.CardinalDirections)
+        // Cell already holds an item (a multi-drop kill, or an enemy died on top of
+        // a potion). Overwriting would leave the first item visible but
+        // unreachable, so spiral outward ring by ring until a free walkable cell
+        // turns up.
+        for (int radius = 1; radius <= MaxScatterRadius; radius++)
         {
-            Vector2Int candidate = cell + direction;
-            if (!DungeonGrid.IsWalkable(candidate) || DungeonGrid.HasItem(candidate)) continue;
+            foreach (Vector2Int candidate in GridUtils.RingCells(cell, radius))
+            {
+                if (!DungeonGrid.IsWalkable(candidate) || DungeonGrid.HasItem(candidate)) continue;
 
-            DungeonGrid.PlaceItem(candidate, this);
-            transform.position = GridUtils.CellToWorld(candidate);
-            return;
+                DungeonGrid.PlaceItem(candidate, this);
+                transform.position = GridUtils.CellToWorld(candidate);
+                return;
+            }
         }
 
-        Debug.LogWarning($"{name}: no free cell near {cell} to place this pickup; destroying it.");
+        Debug.LogWarning($"{name}: no free cell within {MaxScatterRadius} of {cell} to place this pickup; destroying it.");
         Destroy(gameObject);
     }
 

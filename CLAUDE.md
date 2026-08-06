@@ -12,9 +12,11 @@ lives in three files under `.claude/`:
 | `.claude/IN_PROGRESS.md` | Written but not wired, found-but-unfixed bugs, decisions pending |
 | `.claude/ROADMAP.md` | Designed, no code |
 
-**Start a session by reading `.claude/IN_PROGRESS.md`.** As of 2026-08-04 the
-two fully-dead systems it tracked (`PlayerProgression`, enemy loot) are both
-fixed; one lesser gap remains (5 equipment slots have no UI square yet).
+**Start a session by reading `.claude/IN_PROGRESS.md`.** As of 2026-08-05 all
+three dead/unwired systems it tracked (`PlayerProgression`, enemy loot, the 5
+stat-only equipment slots) are fixed and wired. Current open item is
+architecture debt, not missing wiring — see `IN_PROGRESS.md` → "Architecture
+debt".
 
 (All three replaced the old `COMBAT_DESIGN.md`, which mixed spec with status
 and marked non-functional things ✅. Citations below name section *titles*, not
@@ -127,6 +129,42 @@ open -a /Applications/Unity/Hub/Editor/6000.0.80f1/Unity.app \
   sibling `.cs` files appear. This has produced two false alarms. **The headless
   compile is the only source of truth.** Fix = reload the VS Code window.
 
+### UnityMCP fast-path gotchas (learned 2026-08-06)
+
+- **A brand-new `.cs` file needs `refresh_unity scope="all"`, not
+  `scope="scripts"`.** `scope="scripts"` alone left a just-`Write`n file with
+  no `.meta`/GUID (`manage_asset get_info` showed `assetType: "Unknown"`, and
+  the type was invisible to `execute_code` even after `is_compiling: false`)
+  until an `all`-scope refresh actually imported it. Existing-file edits
+  don't need this — only new files.
+- **`manage_asset move` can report `success: false` while actually
+  succeeding.** Moving 3 scripts to fix `CLAUDE.md` §5's file-location debt
+  all came back `false`, but `get_info` on the destination path showed them
+  already moved correctly (GUIDs intact, confirmed via `git diff` on the
+  `.meta`s). Don't trust the boolean — verify with `get_info` before retrying
+  or assuming failure.
+- **`manage_gameobject delete`/other actions can't find a live instance ID**
+  even right after `find_gameobjects`/a resource read returned that exact ID
+  (`by_id` and default search both failed). Fall back to `execute_code` +
+  `UnityEditor.EditorUtility.InstanceIDToObject(id)` and
+  `UnityEngine.Object.DestroyImmediate` directly — reliable every time this
+  session.
+- **`execute_code`'s compiler is CodeDom (C# 6), not Roslyn**, even with
+  `compiler: "auto"` — no `default` literal (C# 7.1+), and `using` directives
+  inside the snippet body don't compile (it's wrapped as a method body, not a
+  file) — fully qualify types instead (`UnityEngine.UI.HorizontalLayoutGroup`)
+  or use `Vector2Int.zero` instead of `default`.
+- **Play mode doesn't tick frames between separate tool calls while the Editor
+  window isn't focused** (`editor_state.editor.is_focused: false` the whole
+  session). Spawned 5 `ItemPickup`s in one `execute_code` call, checked their
+  placement in the next — all 5 were still unregistered at the exact same
+  cell, because `Start()` (which does the placement) never fired between
+  calls despite real wall-clock time passing. Don't chain "do X" / "check X
+  landed" across separate calls expecting a frame to have advanced — either
+  invoke the Unity-called method directly via reflection in the same call
+  (works, `MonoBehaviour.Start()` is just a method), or don't rely on
+  `Start()`/`Update()` timing for verification at all.
+
 ### Verification is not optional
 
 Non-trivial logic leaves one runnable check behind. Pattern that works here: a
@@ -157,6 +195,17 @@ Single scene: `Assets/Scenes/Main.unity`. Single build target entry.
 
 `GameManager` · `TurnManager` · `BattleManager` · `DamageNumberSpawner`
 (self-bootstrapping — creates itself on first access, so it needs no scene object).
+
+### UI binds to the player once, via an event
+
+`GameManager.OnPlayerSpawned` fires once with the live `PlayerController`.
+`HealthBarUI`/`GameOverUI` subscribe and cache the sibling components they
+need (`Inventory`, `Equipment`, `PlayerProgression`, `Wallet`) instead of
+re-resolving `GameManager.Instance.Player` on every call. New UI panels use
+this pattern from the start — `EquipmentPanelUI`/`GoldHUDUI`/
+`FloorIndicatorUI` predate it and still re-resolve per-call (8/4/5 call
+sites respectively as of 2026-08-06); binding them is tracked as debt in
+`IN_PROGRESS.md` → "Architecture debt", not a pattern to copy.
 
 ### Flow
 
@@ -196,6 +245,26 @@ direction/action state) + `Equipment` (one child `EquipmentLayer` per equipped
 slot). The animator drives `Equipment.ApplyFrame(direction, action, frameIndex)`
 on **every** body sprite change — that is the sync mechanism. Never build a
 second animation state machine; extend the existing one.
+
+### Deliberately not adopted
+
+Measured against current Unity best-practice guidance and rejected on
+purpose (architecture review, 2026-08-06) — don't reintroduce these without
+a concrete scale reason:
+
+- **No DI framework** (VContainer/Zenject). Every `Instance` caller here
+  already null-checks and degrades gracefully; a container replaces working
+  code with config for zero felt benefit solo.
+- **No ECS/DOTS.** Pays off at thousands of entities; a floor has dozens.
+- **No MVC/MVP formalization.** UI already renders state and forwards
+  input while gameplay owns state and fires events — the pragmatic version
+  of the pattern is already here.
+- **No asmdef split yet.** Revisit if script count triples or compiles get
+  slow; the folder discipline below makes a later split mechanical.
+- **Folder layout stays type-based** (`Core/`, `Entities/`, `Equipment/`,
+  `Items/`, `Managers/`, `UI/`), not feature-based. Not worth the `.meta`
+  churn at this size. New systems (`Scripts/Shop/`, `Scripts/Save/`) can
+  still be feature-foldered without moving anything existing.
 
 ---
 
@@ -319,6 +388,27 @@ Match the surrounding code — it has a consistent voice worth preserving.
   creates itself and parents under the scene's Canvas on first `Show`, same
   idiom as `DamageNumberSpawner`/`CameraShake`), so **zero scene wiring** was
   needed to ship them. Shared layout code is `ModalScreenUI`.
+
+### Rules for new code (architecture review, 2026-08-06)
+
+1. New player-facing state = new small component on the player, with
+   events (`Inventory`/`Equipment`/`PlayerProgression`/`Wallet` pattern).
+   Never grow an existing one into a manager.
+2. UI binds to the player once via `GameManager.OnPlayerSpawned` (§2 →
+   "UI binds to the player once, via an event"); no `GameManager.Instance`
+   reads inside per-frame or per-click paths.
+3. Gameplay never calls a UI/feedback class directly — fire an event;
+   feedback listens. (`DamageNumberSpawner`/`CameraShake` calls inside
+   `Entity.Attack`/`Heal`/`TakeDamage` are grandfathered until a
+   `CombatFeedback` listener extraction lands — tracked in
+   `.claude/IN_PROGRESS.md` → "Architecture debt".)
+4. Data that designers tune = ScriptableObject. Logic = component or
+   static resolver. Never both in one class.
+5. Formulas live in one static class per domain (`CombatResolver`,
+   `ItemPricing`) — a second copy of any formula anywhere is a bug.
+6. New singletons need a reason `DungeonGrid`-style statics or a plain
+   component can't cover — and if manually scene-placed, their absence
+   must degrade gracefully (null-check + fallback), never throw.
 
 ---
 

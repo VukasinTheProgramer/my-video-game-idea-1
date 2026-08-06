@@ -22,6 +22,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private EquippableItem startingWeapon;
 
     [Header("Floor scaling (all values are per-floor growth; floor 1 = prefab defaults)")]
+    [Tooltip("Layer 0 (.claude/LAYERS.md) is flat - \"no depth scaling of any kind\" across its first N floors, room/enemy count included. Every field below this one is pinned to its floor-1 value through here; scaling (the old additive formula, offset to start from floor Layer0FloorCount+1 instead of floor 2) only resumes past it, as a placeholder until Layer 1's real exponential curve is designed (LAYERS.md -> \"Open / undecided\" leaves hard-jump-vs-continuous at that boundary unresolved - this picks continuous, not a settled design).")]
+    [SerializeField] private int layer0FloorCount = 10;
     [Tooltip("Extra rooms are added every N floors.")]
     [SerializeField] private int floorsPerExtraRoom = 2;
     [SerializeField] private int maxRoomCount = 14;
@@ -136,7 +138,13 @@ public class GameManager : MonoBehaviour
             {
                 if (player.TryGetComponent(out Equipment equipment))
                 {
-                    equipment.Equip(startingWeapon.slot, startingWeapon);
+                    // Routed through ItemGenerator, not equipped raw - the template's
+                    // own hand-authored bonusStats is dead data once anything reads
+                    // stats through the generator (IMPLEMENTED.md -> "Item
+                    // generation"); equipping it directly here would have quietly
+                    // left the starting weapon far weaker than every generated drop.
+                    EquippableItem starting = ItemGenerator.Generate(startingWeapon, 0, startingWeapon.rarity);
+                    equipment.Equip(starting.slot, starting);
                     // Starting gear can raise maxHp, but Awake already set
                     // CurrentHealth from baseStats alone and RefreshEquipmentStats
                     // only ever clamps downward - without this the run begins
@@ -153,10 +161,16 @@ public class GameManager : MonoBehaviour
         player.SpawnAt(spawnCell);
     }
 
+    /// <summary>Floor step used by every depth-scaling formula below - pinned to 0
+    /// for Layer 0's floors so nothing scales there (LAYERS.md -> "Layer 0", "no
+    /// depth scaling of any kind"), then resumes counting from floor
+    /// layer0FloorCount+1 for whatever comes after (see the field's own tooltip).</summary>
+    private int LayerAwareFloorStep() => Mathf.Max(0, CurrentFloor - 1 - layer0FloorCount);
+
     /// <summary>Rooms grow with depth, capped so generation stays reasonable.</summary>
     private int RoomCountForFloor()
     {
-        int floorStep = CurrentFloor - 1;
+        int floorStep = LayerAwareFloorStep();
         int extraRooms = floorsPerExtraRoom > 0 ? floorStep / floorsPerExtraRoom : 0;
         return Mathf.Min(dungeonGenerator.BaseRoomCount + extraRooms, maxRoomCount);
     }
@@ -165,7 +179,7 @@ public class GameManager : MonoBehaviour
     {
         if (enemyPrefab == null) return;
 
-        int floorStep = CurrentFloor - 1;
+        int floorStep = LayerAwareFloorStep();
         int enemiesPerRoom = Mathf.Min(
             1 + (floorsPerExtraEnemy > 0 ? floorStep / floorsPerExtraEnemy : 0),
             maxEnemiesPerRoom);

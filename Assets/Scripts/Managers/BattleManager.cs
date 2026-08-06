@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -7,9 +8,18 @@ using UnityEngine;
 /// on the dungeon grid (not just bumping directly into it - either side can
 /// close the distance) no longer resolves combat inline. Instead it freezes
 /// the dungeon (player movement, every other enemy's AI) and hands control
-/// to a dedicated 1v1 turn-based fight against just that enemy, shown via
-/// BattleScreenUI. When the fight ends, the dungeon resumes and (on a win)
-/// the rest of the floor gets to react, same as any other player action.
+/// to a dedicated turn-based fight against whichever enemies got pulled in,
+/// shown via BattleScreenUI. When the fight ends, the dungeon resumes and (on a
+/// win) the rest of the floor gets to react, same as any other player action.
+///
+/// Multi-enemy support (ROADMAP.md -> "Weapon-driven attack patterns", Axe
+/// cleave/Spear pierce) generalizes the original strict 1v1 design: an
+/// encounter can hold 1-N enemies, decided by AttackPatternResolver at the
+/// moment the player initiates the attack (PlayerController.TryAct). Proximity-
+/// based engagement (TryEngageIfInRange - enemy walks up to the player, or the
+/// player walks into an enemy with no special pattern) always starts a 1-enemy
+/// encounter, same as before this generalization; only PlayerController's new
+/// weapon-pattern-driven attacks ever start a >1 encounter.
 ///
 /// Reuses Entity.Attack/CombatResolver/damage numbers/hit flash as-is - the
 /// battle screen is a different *place* combat happens, not a different
@@ -38,27 +48,36 @@ public class BattleManager : MonoBehaviour
     public static BattleManager Instance { get; private set; }
 
     [SerializeField] private BattleScreenUI screenUI;
-    [Tooltip("Delay before the enemy's turn resolves, so the player can see their own hit land first.")]
+    [Tooltip("Delay before the enemy round resolves, so the player can see their own hit land first.")]
     [SerializeField] private float enemyTurnDelaySeconds = 0.6f;
-    [Tooltip("Manhattan-distance range at which getting close to an enemy opens the battle screen. 1 = adjacent (old bump-to-attack threshold); raise it to have monsters \"notice\" you from further away.")]
+    [Tooltip("Manhattan-distance range at which getting close to an enemy opens the battle screen. 1 = adjacent (old bump-to-attack threshold); raise it to have monsters \"notice\" you from further away. Only used by proximity-based engagement (TryEngageIfInRange) - weapon-pattern-driven attacks (EngagePlayerAttack) start unconditionally, since PlayerController already proved adjacency/line-of-fire itself.")]
     [Min(1)] [SerializeField] private int engageRange = 1;
 
     public bool IsActive { get; private set; }
     public int EngageRange => engageRange;
 
     private PlayerController player;
-    private EnemyController enemy;
+    // Every enemy in the current encounter, with the damage multiplier the
+    // player's attack pattern assigned it (Axe cleave's secondary targets get
+    // AttackPatternResolver.AxeCleaveSecondaryMultiplier; everything else is 1).
+    // Enemy-initiated attacks always ignore this and hit the player at full
+    // damage - only Entity.Attack calls FROM the player use it.
+    private readonly List<(EnemyController Enemy, float DamageMultiplier)> engaged = new List<(EnemyController, float)>();
     private PlayerProgression progression;
     private bool startedOnPlayerTurn;
 
-    // Set the instant either side dies - distinct from IsActive, which now
-    // stays true through the victory/level-up outro screens (so the floor
-    // stays frozen), while this stops turn logic (OnPlayerAttackPressed/
-    // RunEnemyTurn) immediately so nothing keeps swinging at a dead entity.
+    // Set the instant every engaged enemy is dead or the player dies - distinct
+    // from IsActive, which now stays true through the victory/level-up outro
+    // screens (so the floor stays frozen), while this stops turn logic
+    // (OnPlayerAttackPressed/RunEnemyRound) immediately so nothing keeps
+    // swinging once the encounter is decided.
     private bool fightOver;
 
     // Accumulated for the victory screen - reset in StartBattle, read in
-    // HandleVictory before anything gets torn down.
+    // HandleVictory before anything gets torn down. Summed across every
+    // enemy in the encounter, not just one (bug fix: xpEarned/goldEarned used
+    // to overwrite per-kill via `=`, which only mattered once fights could
+    // kill more than one enemy).
     private int playerDamageDealt;
     private int playerDamageTaken;
     private int xpEarned;
@@ -85,31 +104,53 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Starts a battle if player and enemy are already within engageRange -
-    /// call this after either one moves (PlayerController.TryAct,
-    /// EnemyController.TakeTurn). No-op if a battle's already active, either
-    /// is dead, or they're too far apart. Returns whether a battle started.
+    /// Starts a 1-enemy battle if player and enemy are already within
+    /// engageRange - call this after either one moves (PlayerController.TryAct's
+    /// undirected-move fallback, EnemyController.TakeTurn). No-op if a battle's
+    /// already active, either is dead, or they're too far apart. Returns whether
+    /// a battle started. Signature/behavior unchanged from the pre-multi-enemy
+    /// version - always exactly one enemy, still range-gated.
     /// </summary>
     public bool TryEngageIfInRange(PlayerController player, EnemyController enemy)
     {
         if (IsActive || player == null || enemy == null || player.IsDead || enemy.IsDead) return false;
         if (!GridUtils.WithinRange(player.Cell, enemy.Cell, engageRange)) return false;
 
-        StartBattle(player, enemy);
+        StartBattle(player, new List<(EnemyController, float)> { (enemy, 1f) });
         return true;
     }
 
-    /// <summary>Unconditionally starts a battle. Prefer TryEngageIfInRange unless you already know they're in range.</summary>
-    public void StartBattle(PlayerController player, EnemyController enemy)
+    /// <summary>
+    /// Starts a battle against exactly the given targets, unconditionally - no
+    /// engageRange check, since PlayerController.TryAct already proved
+    /// adjacency (melee weapons) or a clear line of fire (Bow/Staff) before
+    /// calling this. This is what every weapon-initiated player attack goes
+    /// through (ROADMAP.md -> "Weapon-driven attack patterns") - single target
+    /// for most weapons, multiple for Axe cleave/Spear pierce. Dead/null
+    /// targets are filtered out; no-ops if nothing valid remains.
+    /// </summary>
+    public bool EngagePlayerAttack(PlayerController player, IReadOnlyList<(EnemyController Enemy, float DamageMultiplier)> targets)
     {
-        if (IsActive || player == null || enemy == null) return;
+        if (IsActive || player == null || player.IsDead || targets == null) return false;
+
+        var valid = targets.Where(t => t.Enemy != null && !t.Enemy.IsDead).ToList();
+        if (valid.Count == 0) return false;
+
+        StartBattle(player, valid);
+        return true;
+    }
+
+    private void StartBattle(PlayerController player, IReadOnlyList<(EnemyController Enemy, float DamageMultiplier)> targets)
+    {
+        if (IsActive || player == null || targets == null || targets.Count == 0) return;
 
         // No screen means no way to input an attack; staying out of battle lets the
         // callers' inline-attack fallback keep the game playable.
         if (screenUI == null) return;
 
         this.player = player;
-        this.enemy = enemy;
+        engaged.Clear();
+        engaged.AddRange(targets);
         IsActive = true;
         fightOver = false;
 
@@ -126,25 +167,33 @@ public class BattleManager : MonoBehaviour
         startedOnPlayerTurn = TurnManager.Instance == null
             || TurnManager.Instance.State == TurnState.PlayerTurn;
 
-        player.OnDeath += HandleAnyDeath;
-        enemy.OnDeath += HandleAnyDeath;
+        player.OnDeath += HandlePlayerDeath;
         player.OnAttackResolved += HandlePlayerAttackResolved;
-        enemy.OnAttackResolved += HandleEnemyAttackResolved;
-        enemy.OnXPGranted += HandleXPGranted;
-        enemy.OnGoldGranted += HandleGoldGranted;
-        enemy.OnLootDropped += HandleLootDropped;
+        foreach (var (enemy, _) in engaged)
+        {
+            enemy.OnDeath += HandleEngagedEnemyDeath;
+            enemy.OnAttackResolved += HandleEnemyAttackResolved;
+            enemy.OnXPGranted += HandleXPGranted;
+            enemy.OnGoldGranted += HandleGoldGranted;
+            enemy.OnLootDropped += HandleLootDropped;
+        }
 
         progression = player.GetComponent<PlayerProgression>();
         if (progression != null) progression.OnLevelUp += HandleLevelUp;
 
-        screenUI?.Show(player, enemy, OnPlayerAttackPressed);
+        screenUI?.Show(player, engaged.Select(e => e.Enemy).ToList(), OnPlayerAttackPressed);
 
         // Bit Heroes ties initiative to Agility (its turn-rate formula factors in
-        // Power+Agility for how *often* you act; we're a simple 1v1 back-and-forth
+        // Power+Agility for how *often* you act; we're a simple back-and-forth
         // rather than a continuous tick engine, so this is the faithful
         // simplification: whoever's faster acts first, then it alternates as
         // normal - see IMPLEMENTED.md -> "Battle screen (encounter flow)").
-        bool playerActsFirst = player.Stats.agility >= enemy.Stats.agility;
+        // Generalized to N enemies by comparing against the fastest one - a
+        // ponytail: simplification, since only relative-to-player ordering is
+        // ever shown (each engaged enemy still just gets its own turn in the
+        // enemy round, not a fully interleaved N-way initiative queue).
+        float fastestEnemyAgility = engaged.Max(e => e.Enemy.Stats.agility);
+        bool playerActsFirst = player.Stats.agility >= fastestEnemyAgility;
         screenUI?.SetTurn(playerActsFirst);
 
         if (playerActsFirst)
@@ -153,7 +202,7 @@ public class BattleManager : MonoBehaviour
         }
         else
         {
-            StartCoroutine(RunEnemyTurn(isOpeningMove: true));
+            StartCoroutine(RunEnemyRound(isOpeningMove: true));
         }
     }
 
@@ -162,23 +211,42 @@ public class BattleManager : MonoBehaviour
         if (!IsActive || fightOver) return;
 
         screenUI?.SetTurn(isPlayerTurn: false);
-        player.Attack(enemy);
 
-        // A death triggers HandleAnyDeath synchronously (Entity.OnDeath fires
-        // before Attack returns), so fightOver is already true here if so.
+        // Snapshot before attacking: Entity.Die() fires OnDeath synchronously,
+        // and HandleEngagedEnemyDeath mutates `engaged` - iterating the live
+        // list while it's being trimmed mid-loop is exactly the hazard
+        // TurnManager already snapshots its own enemy list to avoid (CLAUDE.md
+        // §3, "Destruction is deferred to end of frame").
+        var targets = engaged.ToList();
+        foreach (var (enemy, multiplier) in targets)
+        {
+            // A cleave that kills every remaining engaged enemy flips fightOver mid-loop
+            // (HandleEngagedEnemyDeath sets it the instant `engaged` empties) - stop
+            // swinging at that point instead of attacking already-torn-down state.
+            if (fightOver) break;
+            if (enemy == null || enemy.IsDead) continue;
+            player.Attack(enemy, multiplier);
+        }
+
         if (fightOver) return;
 
-        StartCoroutine(RunEnemyTurn(isOpeningMove: false));
+        StartCoroutine(RunEnemyRound(isOpeningMove: false));
     }
 
-    private IEnumerator RunEnemyTurn(bool isOpeningMove)
+    private IEnumerator RunEnemyRound(bool isOpeningMove)
     {
         screenUI?.SetInputEnabled(false);
         yield return new WaitForSeconds(enemyTurnDelaySeconds);
 
         if (!fightOver)
         {
-            enemy.Attack(player);
+            var attackers = engaged.Select(e => e.Enemy).ToList(); // same snapshot reasoning as OnPlayerAttackPressed
+            foreach (var enemy in attackers)
+            {
+                if (fightOver) break;
+                if (enemy == null || enemy.IsDead) continue;
+                enemy.Attack(player);
+            }
         }
 
         if (!fightOver)
@@ -190,8 +258,8 @@ public class BattleManager : MonoBehaviour
 
     private void HandlePlayerAttackResolved(Entity attacker, Entity defender, CombatResult result) => playerDamageDealt += result.Damage;
     private void HandleEnemyAttackResolved(Entity attacker, Entity defender, CombatResult result) => playerDamageTaken += result.Damage;
-    private void HandleXPGranted(int amount) => xpEarned = amount;
-    private void HandleGoldGranted(int amount) => goldEarned = amount;
+    private void HandleXPGranted(int amount) => xpEarned += amount;
+    private void HandleGoldGranted(int amount) => goldEarned += amount;
 
     private void HandleLootDropped(ItemPickup pickup)
     {
@@ -200,20 +268,46 @@ public class BattleManager : MonoBehaviour
 
     private void HandleLevelUp(int newLevel) => leveledUpToLevel = newLevel;
 
-    private void HandleAnyDeath(Entity deadEntity)
+    /// <summary>One engaged enemy died. Removes it from the encounter and only
+    /// ends the fight once every engaged enemy is gone - a non-last death must
+    /// NOT stop coroutines or set fightOver, since the enemy round (or the rest
+    /// of a cleave's target loop) still needs to run for the survivors.</summary>
+    private void HandleEngagedEnemyDeath(Entity deadEnemy)
+    {
+        if (fightOver) return;
+
+        var match = engaged.FirstOrDefault(e => (Entity)e.Enemy == deadEnemy);
+        if (match.Enemy != null) screenUI?.NotifyEnemyDefeated(match.Enemy);
+
+        engaged.RemoveAll(e => (Entity)e.Enemy == deadEnemy);
+
+        if (engaged.Count > 0) return;
+
+        fightOver = true;
+        StopAllCoroutines();
+        HandleVictory();
+    }
+
+    private void HandlePlayerDeath(Entity deadPlayer)
     {
         if (fightOver) return;
         fightOver = true;
         StopAllCoroutines();
 
-        if (deadEntity == enemy) HandleVictory();
-        else HandlePlayerDeath();
+        IsActive = false;
+        UnsubscribeBattleEvents();
+
+        screenUI?.Hide();
+
+        player = null;
+        engaged.Clear();
+        progression = null;
     }
 
     /// <summary>
-    /// Enemy died: show the victory screen (and, if this kill leveled the
-    /// player up, the level-up screen after it) before the floor is allowed
-    /// to resume. IsActive deliberately stays true through both screens -
+    /// Every engaged enemy died: show the victory screen (and, if this fight
+    /// leveled the player up, the level-up screen after it) before the floor is
+    /// allowed to resume. IsActive deliberately stays true through both screens -
     /// GameManager's floor-advance wait and the player/enemy turn-skip
     /// checks all key off it, so the dungeon stays frozen exactly as long as
     /// an outro screen is on top of it.
@@ -244,7 +338,7 @@ public class BattleManager : MonoBehaviour
         UnsubscribeBattleEvents();
 
         player = null;
-        enemy = null;
+        engaged.Clear();
         progression = null;
 
         // Let the rest of the floor react now that the fight's over - same as
@@ -256,30 +350,17 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    /// <summary>Player died: no outro screen - GameOverUI takes over independently
-    /// via the player's own OnDeath, so this only needs to tear the battle down.</summary>
-    private void HandlePlayerDeath()
-    {
-        IsActive = false;
-        UnsubscribeBattleEvents();
-
-        screenUI?.Hide();
-
-        player = null;
-        enemy = null;
-        progression = null;
-    }
-
     private void UnsubscribeBattleEvents()
     {
         if (player != null)
         {
-            player.OnDeath -= HandleAnyDeath;
+            player.OnDeath -= HandlePlayerDeath;
             player.OnAttackResolved -= HandlePlayerAttackResolved;
         }
-        if (enemy != null)
+        foreach (var (enemy, _) in engaged)
         {
-            enemy.OnDeath -= HandleAnyDeath;
+            if (enemy == null) continue;
+            enemy.OnDeath -= HandleEngagedEnemyDeath;
             enemy.OnAttackResolved -= HandleEnemyAttackResolved;
             enemy.OnXPGranted -= HandleXPGranted;
             enemy.OnGoldGranted -= HandleGoldGranted;
