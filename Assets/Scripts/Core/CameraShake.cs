@@ -13,8 +13,9 @@ using UnityEngine;
 /// Instead this just decays a Vector3 offset over time; CameraFollow adds it
 /// after computing its own base position, so there's exactly one writer of the
 /// camera's transform and no ordering hazard. Once the Pixel Perfect Camera
-/// (§6a) is added, keep this the same way - shaking the camera's own transform
-/// directly would fight pixel snapping.
+/// (ROADMAP.md -> "Retro pixel style — remaining items") is added, keep this
+/// the same way - shaking the camera's own transform directly would fight
+/// pixel snapping.
 /// </summary>
 public class CameraShake : MonoBehaviour
 {
@@ -26,9 +27,10 @@ public class CameraShake : MonoBehaviour
     /// <summary>
     /// Starts (or restarts, if already shaking) a decaying shake.
     /// amplitude is in world units, not pixels - GridUtils.CellSize is 1 world
-    /// unit per tile, so e.g. 0.05 is a subtle shake at 5% of a tile. Once §6a's
-    /// Pixel Perfect Camera fixes a project-wide Pixels Per Unit, convert a
-    /// pixel amount to world units as pixels / PPU before calling this.
+    /// unit per tile, so e.g. 0.05 is a subtle shake at 5% of a tile. Once the
+    /// Pixel Perfect Camera (ROADMAP.md -> "Retro pixel style — remaining
+    /// items") fixes a project-wide Pixels Per Unit, convert a pixel amount to
+    /// world units as pixels / PPU before calling this.
     /// </summary>
     public static void Shake(float amplitude, float durationSeconds)
     {

@@ -124,7 +124,9 @@ public class Equipment : MonoBehaviour
         }
     }
 
-    /// <summary>Weapon family of whatever's in MainHand, or None if empty/unarmed (CombatResolver, §1/§4).</summary>
+    /// <summary>Weapon family of whatever's in MainHand, or None if empty/unarmed - drives
+    /// CombatResolver's scaling/defense stat pick (IMPLEMENTED.md -> "Stat system") and
+    /// attack pattern (IMPLEMENTED.md -> "Weapon-driven attack patterns").</summary>
     public WeaponType EquippedWeaponType => GetEquipped(EquipmentSlot.MainHand)?.weaponType ?? WeaponType.None;
 
     /// <summary>Called by DirectionalSpriteAnimator every time the base body's own sprite changes.</summary>

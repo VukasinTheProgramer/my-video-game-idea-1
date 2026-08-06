@@ -80,7 +80,7 @@ public class PlayerProgression : MonoBehaviour
         OnXPChanged?.Invoke(CurrentXP, XPToNextLevel);
     }
 
-    /// <summary>Spends one available point on the given stat (flat 1:1, §1a). Returns false if no points are left.</summary>
+    /// <summary>Spends one available point on the given stat (flat 1:1, IMPLEMENTED.md -> "Leveling & stat points"). Returns false if no points are left.</summary>
     public bool TrySpendPoint(AllocatableStat stat)
     {
         if (AvailableStatPoints <= 0 || entity == null) return false;

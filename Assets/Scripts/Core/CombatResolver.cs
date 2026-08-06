@@ -60,7 +60,7 @@ public static class CombatResolver
 
         int damage = ResolveDamage(rawDamage, defenseStat, dodged, parried, crit, atk.critDamageBonus);
 
-        // §1 defines life steal as a % of damage *dealt*, so overkill doesn't pay
+        // IMPLEMENTED.md -> "Stat system" defines life steal as a % of damage *dealt*, so overkill doesn't pay
         // out: a 50-damage hit on a 1 HP target only removed 1 HP. The rate is
         // capped here too - it's the one modifier whose cap the doc lists but
         // nothing else in the codebase enforced.
