@@ -4,9 +4,10 @@ using UnityEngine;
 
 /// <summary>
 /// Unlimited-capacity bag of EquippableItems not currently worn. Items enter
-/// by being picked up (EquipmentDropPickup) or by being displaced when
-/// something else is equipped into their slot; they only leave by being
-/// equipped again. There's no "drop" action - once an item is picked up it
+/// on a kill (EnemyController.Die() adds loot straight to the bag - it never
+/// spawns on the floor, IMPLEMENTED.md -> "Enemy loot") or by being displaced
+/// when something else is equipped into their slot; they only leave by being
+/// equipped again. There's no "drop" action - once an item is granted it
 /// stays with the player permanently, living either on a body slot or in
 /// the bag, never destroyed.
 /// </summary>

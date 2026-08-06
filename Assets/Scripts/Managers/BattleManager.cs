@@ -261,9 +261,9 @@ public class BattleManager : MonoBehaviour
     private void HandleXPGranted(int amount) => xpEarned += amount;
     private void HandleGoldGranted(int amount) => goldEarned += amount;
 
-    private void HandleLootDropped(ItemPickup pickup)
+    private void HandleLootDropped(EquippableItem item)
     {
-        if (pickup?.PendingItem != null) itemsDropped.Add(pickup.PendingItem);
+        if (item != null) itemsDropped.Add(item);
     }
 
     private void HandleLevelUp(int newLevel) => leveledUpToLevel = newLevel;

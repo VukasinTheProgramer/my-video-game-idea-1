@@ -57,7 +57,6 @@ public class GameManager : MonoBehaviour
     private PlayerController player;
     private readonly List<EnemyController> spawnedEnemies = new List<EnemyController>();
     private readonly List<HealthPotionPickup> spawnedItems = new List<HealthPotionPickup>();
-    private readonly List<ItemPickup> spawnedDrops = new List<ItemPickup>();
 
     private void Awake()
     {
@@ -111,12 +110,6 @@ public class GameManager : MonoBehaviour
             if (item != null) Destroy(item.gameObject);
         }
         spawnedItems.Clear();
-
-        foreach (ItemPickup drop in spawnedDrops)
-        {
-            if (drop != null) Destroy(drop.gameObject);
-        }
-        spawnedDrops.Clear();
 
         foreach (EnemyController enemy in spawnedEnemies)
         {
@@ -203,7 +196,6 @@ public class GameManager : MonoBehaviour
                 enemy.SetGoldFloorBonus(goldFloorBonus);
                 enemy.SpawnAt(spawnCell);
                 enemy.OnDeath += HandleEnemyDeath;
-                enemy.OnLootDropped += HandleLootDropped;
                 spawnedEnemies.Add(enemy);
             }
         }
@@ -221,7 +213,6 @@ public class GameManager : MonoBehaviour
                 enemy.SetGoldFloorBonus(goldFloorBonus);
                 enemy.SpawnAt(fallbackCell);
                 enemy.OnDeath += HandleEnemyDeath;
-                enemy.OnLootDropped += HandleLootDropped;
                 spawnedEnemies.Add(enemy);
                 Debug.LogWarning($"GameManager: floor {CurrentFloor} spawned no enemies normally; placed one fallback enemy so the floor is completable.");
             }
@@ -247,11 +238,6 @@ public class GameManager : MonoBehaviour
             item.transform.position = GridUtils.CellToWorld(spawnCell);
             spawnedItems.Add(item);
         }
-    }
-
-    private void HandleLootDropped(ItemPickup drop)
-    {
-        spawnedDrops.Add(drop);
     }
 
     private void HandleEnemyDeath(Entity deadEnemy)
@@ -293,27 +279,7 @@ public class GameManager : MonoBehaviour
         FloorCompleteUI.Instance.Show(CurrentFloor, () => continuePressed = true);
         yield return new WaitUntil(() => continuePressed);
 
-        CollectUncollectedDrops();
         CurrentFloor++;
         GenerateFloor();
-    }
-
-    /// <summary>
-    /// Hands loot still lying on the floor to the player before the floor is torn
-    /// down. The last enemy's drop is spawned microseconds before this advance, so
-    /// DespawnPreviousFloor would otherwise destroy it in the same frame it
-    /// appeared - the killing blow of every floor silently ate its own loot, which
-    /// IMPLEMENTED.md -> "Bag / Inventory" ("never destroyed and never lost") forbids.
-    /// </summary>
-    private void CollectUncollectedDrops()
-    {
-        if (player == null || !player.TryGetComponent(out Inventory inventory)) return;
-
-        foreach (ItemPickup drop in spawnedDrops)
-        {
-            if (drop == null) continue;
-            EquippableItem item = drop.PendingItem;
-            if (item != null) inventory.Add(item);
-        }
     }
 }

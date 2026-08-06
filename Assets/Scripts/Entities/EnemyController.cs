@@ -44,10 +44,11 @@ public class EnemyController : Entity
     /// per-floor scaling hook, applied to gold instead of Stats.</summary>
     public void SetGoldFloorBonus(int bonus) => goldFloorBonus = bonus;
 
-    /// <summary>Fires once, right after a loot drop is spawned on death - GameManager
-    /// subscribes to track it for floor-cleanup. Only fires once a LootTable
-    /// asset exists to roll against - see IN_PROGRESS.md -> "1b. Enemy loot".</summary>
-    public event Action<ItemPickup> OnLootDropped;
+    /// <summary>Fires once per item, right after it's added to the killer's bag -
+    /// BattleManager subscribes to list drops on the victory screen. Loot goes
+    /// straight to the bag on kill, never spawns on the floor (IMPLEMENTED.md ->
+    /// "Enemy loot").</summary>
+    public event Action<EquippableItem> OnLootDropped;
 
     /// <summary>Fires once on a kill with the exact amount granted - lets a victory
     /// screen show precise numbers instead of diffing Wallet/PlayerProgression
@@ -164,20 +165,17 @@ public class EnemyController : Entity
 
     protected override void Die()
     {
-        if (lootTable != null)
+        if (lootTable != null && player != null)
         {
-            // Every drop spawns at the same death cell - ItemPickup.Start()'s own
-            // spiral scatter search (widened for this, ROADMAP.md -> "Multi-drop
-            // loot rolls") handles fanning simultaneous drops out to nearby free
-            // cells, so this loop doesn't need its own placement logic.
+            Inventory inventory = player.GetComponent<Inventory>();
             foreach (EquippableItem drop in lootTable.RollDrops())
             {
                 // floorStep 0 - items never had per-floor scaling before this, so
                 // there's nothing to gate; stays off until Layer 1 exists
                 // (IMPLEMENTED.md -> "Item generation").
                 EquippableItem generated = ItemGenerator.Generate(drop, 0, drop.rarity);
-                ItemPickup pickup = EquipmentDropPickup.SpawnAt(Cell, generated);
-                OnLootDropped?.Invoke(pickup);
+                inventory?.Add(generated);
+                OnLootDropped?.Invoke(generated);
             }
         }
 
