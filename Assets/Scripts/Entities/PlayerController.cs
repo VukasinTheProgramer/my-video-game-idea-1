@@ -70,21 +70,33 @@ public class PlayerController : Entity
         if (autoWalkPath.Count > 0) ContinueAutoWalk();
     }
 
-    /// <summary>The nearest registered interactable within its own InteractRange of
-    /// the player's current cell, or null. Ambient - checked every frame regardless of
-    /// movement or clicks, since showing the prompt has no side effect; only pressing
-    /// E does.</summary>
+    /// <summary>The first registered interactable within its own InteractRange of
+    /// the player's current cell (registry iteration order, not distance - genuine
+    /// overlap is rare and both are one keypress away either way), or null. Ambient -
+    /// checked every frame regardless of movement or clicks, since showing the prompt
+    /// has no side effect; only pressing E does.</summary>
     private IInteractable FindNearbyInteractable()
     {
         // Checks every cell a multi-tile fixture (e.g. a 2-wide LootChest) occupies,
         // not just one anchor point, so the prompt appears at InteractRange from
         // whichever side the player actually approaches from.
+        //
+        // Outer foreach stays as-is - DungeonGrid.Interactables is concretely typed
+        // (Dictionary<>.ValueCollection, not IEnumerable<IInteractable>) specifically
+        // so this foreach binds its own non-boxing struct enumerator, per that
+        // property's own doc comment. IInteractable.Cells, though, is interface-typed
+        // (IReadOnlyList<Vector2Int>) - foreach-ing THAT boxes the backing struct
+        // enumerator every time, measured 38B/interactable/frame here before this fix
+        // (perf audit, 2026-08-06). Count/indexer calls on an interface don't box, so
+        // an indexed loop fixes it without changing the interface.
         foreach (IInteractable interactable in DungeonGrid.Interactables)
         {
             if (interactable == null) continue;
-            foreach (Vector2Int cell in interactable.Cells)
+
+            IReadOnlyList<Vector2Int> cells = interactable.Cells;
+            for (int c = 0; c < cells.Count; c++)
             {
-                if (GridUtils.WithinRange(Cell, cell, interactable.InteractRange)) return interactable;
+                if (GridUtils.WithinRange(Cell, cells[c], interactable.InteractRange)) return interactable;
             }
         }
         return null;

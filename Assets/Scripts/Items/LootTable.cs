@@ -126,15 +126,22 @@ public class LootTable : ScriptableObject
         return null; // table sums to 100 so this shouldn't happen, but stay defensive rather than throw
     }
 
+    /// <summary>Reservoir sampling over entries, uniform among the matching ones,
+    /// without building an intermediate candidates list - up to 10 calls happen per
+    /// kill (one per succeeding RollDrops slot), each previously allocating its own
+    /// List (perf audit, 2026-08-06); this allocates nothing.</summary>
     private EquippableItem PickItemOfRarity(Rarity rarity)
     {
-        var candidates = new List<EquippableItem>();
+        EquippableItem chosen = null;
+        int seen = 0;
         foreach (Entry entry in entries)
         {
-            if (entry?.item != null && entry.item.rarity == rarity) candidates.Add(entry.item);
+            if (entry?.item != null && entry.item.rarity == rarity && Random.Range(0, ++seen) == 0)
+            {
+                chosen = entry.item;
+            }
         }
-        if (candidates.Count == 0) return null; // no item authored at this tier yet
-        return candidates[Random.Range(0, candidates.Count)];
+        return chosen; // null if no item authored at this tier yet
     }
 
     /// <summary>Picks one item whose rarity is minRarity or better (Rarity's explicit

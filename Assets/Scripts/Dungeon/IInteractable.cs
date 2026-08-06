@@ -14,7 +14,11 @@ public interface IInteractable
 {
     /// <summary>Every cell this fixture occupies (at least one). Implementations
     /// should cache this array once (e.g. in Start) rather than allocate on each
-    /// access - PlayerController.FindNearbyInteractable reads it every frame.</summary>
+    /// access - PlayerController.FindNearbyInteractable reads it every frame via an
+    /// indexed loop (Count/indexer on this interface, never foreach - foreach-ing
+    /// an interface-typed IReadOnlyList boxes the backing struct enumerator, caught
+    /// by the 2026-08-06 perf audit despite implementations already caching
+    /// correctly on their own side).</summary>
     IReadOnlyList<Vector2Int> Cells { get; }
 
     /// <summary>Manhattan-distance range at which the ambient prompt appears,
