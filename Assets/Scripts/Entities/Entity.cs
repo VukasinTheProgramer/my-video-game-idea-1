@@ -68,8 +68,11 @@ public class Entity : MonoBehaviour
     /// Cell-to-world offset by half a unit on X: entity sprites use a bottom-center
     /// pivot (so SpriteRenderer.flipX mirrors them in place instead of jumping a
     /// full cell when facing changes), while the grid/tilemap are corner-anchored.
+    /// Public so purely cosmetic transform animation (BattleManager's pre-fight
+    /// approach) can compute/restore a cell's on-screen position without a second
+    /// copy of the offset.
     /// </summary>
-    private static Vector3 VisualPosition(Vector2Int cell)
+    public static Vector3 VisualPosition(Vector2Int cell)
     {
         return GridUtils.CellToWorld(cell) + new Vector3(0.5f, 0f, 0f);
     }

@@ -1,35 +1,117 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>
-/// Reads player input and translates it into one grid action per turn:
-/// move into an empty walkable cell, or attack per the equipped weapon's
-/// pattern (ROADMAP.md -> "Weapon-driven attack patterns" - no new hotkeys,
-/// the same directional input just means something different per weapon).
-/// Only responds to input while it's the player's turn.
+/// Click-to-move only - no WASD/arrow keys. A click plans a route once
+/// (Pathfinder.FindPath) and the player walks it one cell per turn. Clicking
+/// directly on an enemy is a valid target - DungeonGrid.IsWalkable is terrain-only
+/// and doesn't care about occupancy - and the walk never has to step onto its cell,
+/// because coming within BattleManager.EngageRange opens the battle screen first.
+/// Each step still resolves through the same TryAct as before: move into an empty
+/// walkable cell, or attack per the equipped weapon's pattern (ROADMAP.md ->
+/// "Weapon-driven attack patterns").
 /// </summary>
 [RequireComponent(typeof(Entity))]
 public class PlayerController : Entity
 {
+    // Planned once per click and then followed, rather than re-derived each turn.
+    // See Pathfinder.FindPath for why re-planning against a moving obstacle cycles.
+    private readonly List<Vector2Int> autoWalkPath = new List<Vector2Int>();
+    private Vector2Int? pendingClickCell;
+
     private void Update()
     {
+        // Polled every frame, deliberately outside the turn-state gate below:
+        // GetMouseButtonDown is true for exactly one frame, while the enemy phase
+        // spans several (TurnManager's stagger + animationTailSeconds), so gating
+        // this behind PlayerTurn silently dropped any click made while the enemies
+        // were still acting - which is most of the time during a walk.
+        if (Input.GetMouseButtonDown(0)) BufferClick();
+
         if (TurnManager.Instance == null || TurnManager.Instance.State != TurnState.PlayerTurn) return;
-        if (BattleManager.Instance != null && BattleManager.Instance.IsActive) return; // input goes to the battle screen instead
+        if (BattleManager.Instance != null && BattleManager.Instance.IsActive)
+        {
+            // An enemy can also open the battle screen on its own turn (EnemyController.TakeTurn)
+            // mid-route - that path never touches PlayerController, so without this the stale
+            // route would survive the fight and resume once it ends. Whichever side started
+            // the battle, stay put once it's over.
+            StopAutoWalk();
+            return; // input goes to the battle screen instead
+        }
 
-        Vector2Int? move = ReadMoveInput();
-        if (move == null) return;
+        if (pendingClickCell != null)
+        {
+            StartAutoWalk(pendingClickCell.Value);
+            pendingClickCell = null;
+        }
 
-        TryAct(move.Value);
+        if (autoWalkPath.Count > 0) ContinueAutoWalk();
     }
 
-    private Vector2Int? ReadMoveInput()
+    private void StopAutoWalk()
     {
-        // WASD / arrow keys, one cell per key press (GetKeyDown, not held).
-        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) return Vector2Int.up;
-        if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) return Vector2Int.down;
-        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) return Vector2Int.left;
-        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) return Vector2Int.right;
-        return null;
+        autoWalkPath.Clear();
+        pendingClickCell = null;
+    }
+
+    /// <summary>Resolves the click to a cell immediately, even if it can't be acted on
+    /// until the enemy phase ends. Converting now (not when the turn comes around) is
+    /// deliberate: the camera follows the player, so a later conversion of the same
+    /// screen point would name whatever cell had slid under the cursor by then.</summary>
+    private void BufferClick()
+    {
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return; // clicked UI, not the map
+        if (Camera.main == null) return;
+
+        Vector2Int cell = GridUtils.WorldToCell(Camera.main.ScreenToWorldPoint(Input.mousePosition));
+        if (!DungeonGrid.IsWalkable(cell)) return; // clicked a wall — same as walking into one, not a valid target
+
+        pendingClickCell = cell;
+    }
+
+    private void StartAutoWalk(Vector2Int goal)
+    {
+        autoWalkPath.Clear();
+
+        List<Vector2Int> path = Pathfinder.FindPath(Cell, goal);
+        if (path == null) return; // unreachable, or already standing there
+
+        autoWalkPath.AddRange(path);
+    }
+
+    /// <summary>Takes the next cell off the planned route. Deliberately does NOT
+    /// re-plan around anything that got in the way - stopping is the correct answer
+    /// there, and re-planning every turn is what made the player circle a chasing
+    /// enemy forever instead of ever arriving (see Pathfinder.FindPath).</summary>
+    private void ContinueAutoWalk()
+    {
+        if (TryEngageNearbyEnemy())
+        {
+            // Walked into engage range of something - fight it, and drop the rest of
+            // the route rather than resuming toward the click once combat ends.
+            StopAutoWalk();
+            return;
+        }
+
+        Vector2Int next = autoWalkPath[0];
+
+        // Something occupies the next cell but wasn't close enough to engage above
+        // (a dead enemy still awaiting cleanup, another entity). Don't burn turns
+        // shuffling around it.
+        if (DungeonGrid.IsOccupied(next))
+        {
+            StopAutoWalk();
+            return;
+        }
+
+        autoWalkPath.RemoveAt(0);
+
+        // TryAct declines some moves without spending the turn. Since the turn didn't
+        // end, Update would run again next frame and retry forever - stop instead.
+        Vector2Int before = Cell;
+        TryAct(next - Cell);
+        if (Cell == before) StopAutoWalk();
     }
 
     private void TryAct(Vector2Int direction)

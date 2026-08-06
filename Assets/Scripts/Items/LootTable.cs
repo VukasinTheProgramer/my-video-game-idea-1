@@ -29,11 +29,14 @@ public class LootTable : ScriptableObject
 
     // Rolled independently, all at once, not gated on each other - "double
     // Common" or "Common + Rare together" both fall out naturally from two
-    // slots landing differently, no per-combination special-casing. Sums to
-    // ~230.4%, i.e. ~2.3 expected items per kill on average.
+    // slots landing differently, no per-combination special-casing. Halved
+    // from the original 95/56/33/19.5/11.5/6.8/4/2.4/1.4/0.8 (~230.4%, ~2.3
+    // items/kill - too frequent for an unlimited bag with no pickup friction)
+    // down to ~115.2%, i.e. ~1.15 expected items per kill on average, same
+    // decay shape just scaled down.
     private static readonly float[] SlotChances =
     {
-        95f, 56f, 33f, 19.5f, 11.5f, 6.8f, 4f, 2.4f, 1.4f, 0.8f
+        47.5f, 28f, 16.5f, 9.75f, 5.75f, 3.4f, 2f, 1.2f, 0.7f, 0.4f
     };
 
     // Flat per-item % a succeeding slot lands on this rarity - solved backward

@@ -14,11 +14,11 @@ public static class Pathfinder
     private static readonly Dictionary<Vector2Int, Vector2Int> cameFrom = new Dictionary<Vector2Int, Vector2Int>();
     private static readonly Queue<Vector2Int> queue = new Queue<Vector2Int>();
 
-    /// <summary>Returns the cell adjacent to start to move into next along the shortest walkable path toward goal, or null if unreachable. This is an absolute cell, not a direction offset.</summary>
-    public static Vector2Int? FindNextStep(Vector2Int start, Vector2Int goal)
+    /// <summary>Fills cameFrom with the BFS tree from start; returns whether goal was
+    /// reached. The goal cell is enterable even when occupied (so you can path *at* an
+    /// enemy to engage it), but no other occupied cell is.</summary>
+    private static bool Search(Vector2Int start, Vector2Int goal)
     {
-        if (start == goal) return null;
-
         cameFrom.Clear();
         queue.Clear();
         cameFrom[start] = start;
@@ -27,7 +27,7 @@ public static class Pathfinder
         while (queue.Count > 0)
         {
             Vector2Int current = queue.Dequeue();
-            if (current == goal) break;
+            if (current == goal) return true;
 
             foreach (Vector2Int direction in GridUtils.CardinalDirections)
             {
@@ -41,7 +41,14 @@ public static class Pathfinder
             }
         }
 
-        if (!cameFrom.ContainsKey(goal)) return null;
+        return cameFrom.ContainsKey(goal);
+    }
+
+    /// <summary>Returns the cell adjacent to start to move into next along the shortest walkable path toward goal, or null if unreachable. This is an absolute cell, not a direction offset.</summary>
+    public static Vector2Int? FindNextStep(Vector2Int start, Vector2Int goal)
+    {
+        if (start == goal) return null;
+        if (!Search(start, goal)) return null;
 
         Vector2Int step = goal;
         while (cameFrom[step] != start)
@@ -49,5 +56,27 @@ public static class Pathfinder
             step = cameFrom[step];
         }
         return step;
+    }
+
+    /// <summary>
+    /// The whole route from start to goal as absolute cells, start excluded and goal
+    /// included, or null if unreachable. Callers that follow a route over several turns
+    /// should plan once with this rather than re-running FindNextStep each turn:
+    /// re-planning every turn against a *moving* obstacle can cycle forever (the player
+    /// circling an enemy in a two-wide corridor), because each new plan is only optimal
+    /// for a layout that changes again before the next step.
+    /// </summary>
+    public static List<Vector2Int> FindPath(Vector2Int start, Vector2Int goal)
+    {
+        if (start == goal) return null;
+        if (!Search(start, goal)) return null;
+
+        var path = new List<Vector2Int>();
+        for (Vector2Int cell = goal; cell != start; cell = cameFrom[cell])
+        {
+            path.Add(cell);
+        }
+        path.Reverse();
+        return path;
     }
 }
