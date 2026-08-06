@@ -68,7 +68,9 @@ public class GameManager : MonoBehaviour
         Instance = this;
     }
 
-    private void Start()
+    /// <summary>Called by MainMenuUI's Start button - the dungeon doesn't exist
+    /// until this runs, not just visually hidden behind a menu.</summary>
+    public void BeginRun()
     {
         GenerateFloor();
     }
