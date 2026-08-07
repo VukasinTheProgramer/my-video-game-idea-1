@@ -34,6 +34,12 @@ public class BattleScreenUI : MonoBehaviour
     [SerializeField] private Text turnIndicatorText;
     [SerializeField] private Button attackButton;
 
+    [Header("Combat feedback (IMPLEMENTED.md -> \"Combat feedback\") - UI-space so it renders on top of this full-screen overlay; DamageNumberSpawner's world-space text is hidden behind it")]
+    [SerializeField] private float feedbackFloatDistance = 40f;
+    [SerializeField] private float feedbackLifetimeSeconds = 0.7f;
+    [SerializeField] private int feedbackFontSize = 20;
+    [SerializeField] private int feedbackBigFontSize = 28;
+
     private readonly List<BattleEnemyPanelUI> enemyPanelPool = new List<BattleEnemyPanelUI>();
     private readonly Dictionary<EnemyController, BattleEnemyPanelUI> activePanels = new Dictionary<EnemyController, BattleEnemyPanelUI>();
 
@@ -131,10 +137,17 @@ public class BattleScreenUI : MonoBehaviour
         player = null;
         onAttackPressed = null;
 
+        // A number still mid-float when the fight ends would otherwise freeze
+        // here (Update doesn't run on components under an inactive GameObject)
+        // and resume the instant this same pooled panel/icon reactivates for the
+        // NEXT battle - showing up as a phantom hit before anyone's swung.
+        ClearFeedback(playerIcon != null ? playerIcon.transform : null);
+
         foreach (var panel in enemyPanelPool)
         {
             panel.Unbind();
             panel.gameObject.SetActive(false);
+            ClearFeedback(panel.transform);
         }
         activePanels.Clear();
 
@@ -169,6 +182,62 @@ public class BattleScreenUI : MonoBehaviour
         if (playerHealthBar == null) return;
         playerHealthBar.maxValue = max;
         playerHealthBar.value = current;
+    }
+
+    /// <summary>Shows one attack's outcome (damage/crit/miss/parry) over whichever
+    /// portrait actually took the hit - BattleManager calls this from its existing
+    /// OnAttackResolved subscriptions (both player-attacks-enemy and
+    /// enemy-attacks-player), passing the defender straight through. No-ops if the
+    /// target isn't currently shown on screen (e.g. it died and its panel was
+    /// already unbound).</summary>
+    public void ShowCombatFeedback(Entity target, CombatResult result)
+    {
+        RectTransform parent = null;
+        if (target == player && playerIcon != null)
+        {
+            parent = playerIcon.rectTransform;
+        }
+        else if (target is EnemyController enemy && activePanels.TryGetValue(enemy, out BattleEnemyPanelUI panel))
+        {
+            parent = (RectTransform)panel.transform;
+        }
+
+        if (parent == null) return;
+
+        var (text, color, big) = CombatFeedbackText.For(result);
+        SpawnFeedback(parent, text, color, big);
+    }
+
+    private void SpawnFeedback(RectTransform parent, string text, Color color, bool big)
+    {
+        var go = new GameObject("CombatFeedback", typeof(RectTransform), typeof(Text));
+        go.transform.SetParent(parent, false);
+
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(140f, 40f);
+
+        Text label = go.GetComponent<Text>();
+        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        label.alignment = TextAnchor.MiddleCenter;
+        label.text = text;
+        label.color = color;
+        label.fontSize = big ? feedbackBigFontSize : feedbackFontSize;
+        label.fontStyle = big ? FontStyle.Bold : FontStyle.Normal;
+
+        BattleFloatingTextMotion motion = go.AddComponent<BattleFloatingTextMotion>();
+        motion.Init(feedbackFloatDistance, feedbackLifetimeSeconds);
+    }
+
+    private static void ClearFeedback(Transform parent)
+    {
+        if (parent == null) return;
+        for (int i = parent.childCount - 1; i >= 0; i--)
+        {
+            Transform child = parent.GetChild(i);
+            if (child.GetComponent<BattleFloatingTextMotion>() != null) Destroy(child.gameObject);
+        }
     }
 
     private static void SetIcon(Image image, Entity entity)

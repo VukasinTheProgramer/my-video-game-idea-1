@@ -224,6 +224,7 @@ public class GameManager : MonoBehaviour
             attack = (floorStep / 2) * scaling.enemyDamagePerFloor,
         };
         int goldFloorBonus = floorStep * scaling.goldBonusPerFloor;
+        int xpFloorBonus = floorStep * scaling.xpBonusPerFloor;
 
         // Rooms after the player's starting room get enemies; deeper floors pack in more.
         for (int roomIndex = 1; roomIndex < roomCount; roomIndex++)
@@ -238,6 +239,7 @@ public class GameManager : MonoBehaviour
                 ApplyEarlyFloorHealthScaling(enemy);
                 ApplyEarlyFloorAttackScaling(enemy);
                 enemy.SetGoldFloorBonus(goldFloorBonus);
+                enemy.SetXpFloorBonus(xpFloorBonus);
                 enemy.SpawnAt(spawnCell);
                 enemy.OnDeath += HandleEnemyDeath;
                 spawnedEnemies.Add(enemy);
@@ -257,6 +259,7 @@ public class GameManager : MonoBehaviour
                 ApplyEarlyFloorHealthScaling(enemy);
                 ApplyEarlyFloorAttackScaling(enemy);
                 enemy.SetGoldFloorBonus(goldFloorBonus);
+                enemy.SetXpFloorBonus(xpFloorBonus);
                 enemy.SpawnAt(fallbackCell);
                 enemy.OnDeath += HandleEnemyDeath;
                 spawnedEnemies.Add(enemy);

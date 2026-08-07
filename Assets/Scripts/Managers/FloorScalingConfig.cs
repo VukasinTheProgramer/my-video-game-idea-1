@@ -49,4 +49,7 @@ public class FloorScalingConfig : ScriptableObject
 
     [Tooltip("Bonus gold per enemy kill, added per floor past the first (ROADMAP.md -> \"Currency: gold & gems\").")]
     public int goldBonusPerFloor = 1;
+
+    [Tooltip("Bonus XP per enemy kill, added per floor past the first - same mechanism as goldBonusPerFloor, closes the gap where every enemy granted identical XP regardless of floor (IN_PROGRESS.md -> tuning gap, fixed 2026-08-07).")]
+    public int xpBonusPerFloor = 2;
 }

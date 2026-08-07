@@ -39,10 +39,16 @@ public class EnemyController : Entity
     [SerializeField] private int goldRewardMax = 5;
 
     private int goldFloorBonus;
+    private int xpFloorBonus;
 
     /// <summary>Set by GameManager at spawn, alongside ApplyStatBonus - the same
     /// per-floor scaling hook, applied to gold instead of Stats.</summary>
     public void SetGoldFloorBonus(int bonus) => goldFloorBonus = bonus;
+
+    /// <summary>Set by GameManager at spawn, same mechanism as SetGoldFloorBonus -
+    /// closes the tuning gap where every enemy granted identical XP regardless of
+    /// floor depth.</summary>
+    public void SetXpFloorBonus(int bonus) => xpFloorBonus = bonus;
 
     // All default to "no change" (1f / false) so a plain enemy's Die() behaves
     // identically to before this existed - only GameManager.SpawnBoss sets these,
@@ -203,8 +209,9 @@ public class EnemyController : Entity
         if (player != null)
         {
             PlayerProgression progression = player.GetComponent<PlayerProgression>();
-            progression?.AddXP(xpReward);
-            OnXPGranted?.Invoke(xpReward);
+            int totalXp = xpReward + xpFloorBonus;
+            progression?.AddXP(totalXp);
+            OnXPGranted?.Invoke(totalXp);
 
             Wallet wallet = player.GetComponent<Wallet>();
             int gold = UnityEngine.Random.Range(goldRewardMin, goldRewardMax + 1) + goldFloorBonus;

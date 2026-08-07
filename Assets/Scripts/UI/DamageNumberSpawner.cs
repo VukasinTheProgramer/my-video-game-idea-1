@@ -41,11 +41,9 @@ public class DamageNumberSpawner : MonoBehaviour
     [SerializeField] private float normalCharacterSize = 0.1f;
     [SerializeField] private float bigCharacterSize = 0.14f;
 
-    // IMPLEMENTED.md -> "Combat feedback": damage-number colors.
-    private static readonly Color MissColor = new Color(0.75f, 0.75f, 0.75f);
-    private static readonly Color ParryColor = new Color(0.35f, 0.55f, 1f);
-    private static readonly Color CritColor = Color.yellow;
-    private static readonly Color NormalColor = Color.white;
+    // IMPLEMENTED.md -> "Combat feedback": MISS/PARRY/CRIT text+color come from
+    // CombatFeedbackText (shared with BattleScreenUI); heal is the one outcome
+    // that class doesn't cover, so its color stays local to this spawner.
     private static readonly Color HealColor = new Color(0.3f, 0.9f, 0.35f);
 
     private void Awake()
@@ -61,19 +59,8 @@ public class DamageNumberSpawner : MonoBehaviour
     /// <summary>Shows the outcome of one Entity.Attack call above the defender.</summary>
     public void ShowAttackResult(Entity target, CombatResult result)
     {
-        if (result.WasDodged)
-        {
-            Spawn(target, "MISS", MissColor, big: false);
-            return;
-        }
-
-        if (result.WasParried)
-        {
-            Spawn(target, "PARRY", ParryColor, big: false);
-            return;
-        }
-
-        Spawn(target, result.Damage.ToString(), result.WasCrit ? CritColor : NormalColor, big: result.WasCrit);
+        var (text, color, big) = CombatFeedbackText.For(result);
+        Spawn(target, text, color, big);
     }
 
     /// <summary>Shows a heal number (potions, life steal, future abilities) above the healed entity.</summary>
@@ -86,6 +73,11 @@ public class DamageNumberSpawner : MonoBehaviour
     private void Spawn(Entity target, string text, Color color, bool big)
     {
         if (target == null) return;
+        // Battle screen already shows its own UI-space feedback
+        // (BattleScreenUI.ShowCombatFeedback) on top of its full-screen overlay -
+        // this world-space spawn would just sit invisible behind it. Suppress it
+        // while a battle's active instead of wasting a GameObject every hit.
+        if (BattleManager.Instance != null && BattleManager.Instance.IsActive) return;
 
         var go = new GameObject("DamageNumber");
         go.transform.position = target.transform.position + Vector3.up * spawnHeightOffset;

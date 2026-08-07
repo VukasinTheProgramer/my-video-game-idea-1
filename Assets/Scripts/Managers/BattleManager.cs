@@ -316,8 +316,17 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    private void HandlePlayerAttackResolved(Entity attacker, Entity defender, CombatResult result) => playerDamageDealt += result.Damage;
-    private void HandleEnemyAttackResolved(Entity attacker, Entity defender, CombatResult result) => playerDamageTaken += result.Damage;
+    private void HandlePlayerAttackResolved(Entity attacker, Entity defender, CombatResult result)
+    {
+        playerDamageDealt += result.Damage;
+        screenUI?.ShowCombatFeedback(defender, result);
+    }
+
+    private void HandleEnemyAttackResolved(Entity attacker, Entity defender, CombatResult result)
+    {
+        playerDamageTaken += result.Damage;
+        screenUI?.ShowCombatFeedback(defender, result);
+    }
     private void HandleXPGranted(int amount) => xpEarned += amount;
     private void HandleGoldGranted(int amount) => goldEarned += amount;
 
