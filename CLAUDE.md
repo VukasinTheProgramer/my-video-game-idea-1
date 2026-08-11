@@ -453,6 +453,11 @@ boss multipliers) and `.claude/ITEM_SCALING.md` (item stat generation, which
 depends on Layers and is built after it). Same status as `ROADMAP.md` —
 designed, no code.
 
+`.claude/ART_STYLE.md` holds pixel-art generation conventions (sprite sizes
+as actually used in the code, not assumed; the aseprite-mcp pipeline's
+gotchas; reference prompts for characters/items/skills/environment art).
+Read it before generating any new sprite.
+
 Before trusting *any* "it's built" claim in those files, spend ten seconds on
 the §0 recipe:
 

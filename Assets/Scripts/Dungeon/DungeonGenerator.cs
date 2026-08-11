@@ -26,7 +26,52 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private Tilemap floorTilemap;
     [SerializeField] private TileBase floorTile;
 
+    // The border lives on the wall side, not the floor: floorTile is a single
+    // plain sprite and the ring of non-walkable cells around it is painted with
+    // these, each rotated per-cell at paint time. Putting the border on the floor
+    // instead needed 31 pre-rotated variants and still left seams wherever a
+    // combination had no matching art.
+    //
+    // All four are authored facing north (and north-east for the two corner
+    // shapes); rotation comes from SetTransformMatrix, so orientation is data.
+    [SerializeField] private TileBase wallTile;       // no floor on any side
+    [SerializeField] private TileBase wallEdgeTile;   // floor on one side
+    [SerializeField] private TileBase wallCornerTile; // floor on two adjacent sides
+    [SerializeField] private TileBase wallNubTile;    // floor touching only at a corner
+
+    // Clockwise from north, so a shape's rotation step is just the index of the
+    // direction it faces - see WallTileFor.
+    private static readonly Vector2Int[] Clockwise =
+    {
+        new Vector2Int(0, 1), new Vector2Int(1, 0), new Vector2Int(0, -1), new Vector2Int(-1, 0),
+    };
+
+    private static readonly Vector2Int[] ClockwiseDiagonals =
+    {
+        new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, -1), new Vector2Int(-1, 1),
+    };
+
+    // k clockwise quarter turns about the cell's centre. The tilemap anchors at the
+    // cell's bottom-left corner, so a bare rotation would swing the sprite out of
+    // its cell - hence the translate/rotate/translate composite.
+    private static readonly Matrix4x4[] Rotations = BuildRotations();
+
+    private static Matrix4x4[] BuildRotations()
+    {
+        var result = new Matrix4x4[4];
+        var centre = new Vector3(0.5f, 0.5f, 0f);
+        for (int k = 0; k < 4; k++)
+        {
+            result[k] = Matrix4x4.TRS(centre, Quaternion.Euler(0f, 0f, -90f * k), Vector3.one)
+                        * Matrix4x4.Translate(-centre);
+        }
+        return result;
+    }
+
     private readonly List<RectInt> rooms = new List<RectInt>();
+
+    // Reused across floors so the wall sweep doesn't allocate a set per generation.
+    private readonly HashSet<Vector2Int> wallCells = new HashSet<Vector2Int>();
 
     // Working state for the current floor, seeded from layout's read-only
     // floor-1 baseline in Awake and grown per floor by SetRoomCount - never
@@ -281,6 +326,107 @@ public class DungeonGenerator : MonoBehaviour
         }
 
         floorTilemap.SetTiles(positions, tiles);
+        PaintWalls(cells);
+    }
+
+    // Paints the one-cell ring of non-walkable cells touching the floor. Not
+    // batched like the floor above: each wall cell also needs its own rotation,
+    // and SetTransformMatrix is per-cell only. It runs once per floor, not per
+    // frame, so the extra calls don't matter.
+    private void PaintWalls(IReadOnlyCollection<Vector2Int> floorCells)
+    {
+        if (wallEdgeTile == null) return;
+
+        wallCells.Clear();
+        foreach (var cell in floorCells)
+        {
+            for (int d = 0; d < 4; d++) CollectWall(cell + Clockwise[d]);
+            for (int d = 0; d < 4; d++) CollectWall(cell + ClockwiseDiagonals[d]);
+        }
+
+        foreach (var cell in wallCells)
+        {
+            int rotation;
+            TileBase tile = WallTileFor(cell, out rotation);
+            if (tile == null) continue;
+
+            var position = new Vector3Int(cell.x, cell.y, 0);
+            floorTilemap.SetTile(position, tile);
+            floorTilemap.SetTransformMatrix(position, Rotations[rotation]);
+        }
+    }
+
+    private void CollectWall(Vector2Int cell)
+    {
+        if (!DungeonGrid.IsWalkable(cell)) wallCells.Add(cell);
+    }
+
+    // Picks the wall shape from which sides face floor, plus how many clockwise
+    // quarter turns put the authored (north-facing) sprite in that orientation.
+    // Because Clockwise is ordered north/east/south/west, the direction index IS
+    // the rotation step - no lookup table needed.
+    //
+    // Two opposite sides, or three or more, fall through to the plain wall tile:
+    // those only occur on a wall thin enough to have floor on both faces, which
+    // this generator's 1-cell room padding doesn't produce.
+    private TileBase WallTileFor(Vector2Int cell, out int rotation)
+    {
+        rotation = 0;
+
+        int sides = 0;
+        int sideCount = 0;
+        for (int d = 0; d < 4; d++)
+        {
+            if (!DungeonGrid.IsWalkable(cell + Clockwise[d])) continue;
+            sides |= 1 << d;
+            sideCount++;
+        }
+
+        if (sideCount == 1)
+        {
+            rotation = BitIndex(sides);
+            return wallEdgeTile;
+        }
+
+        if (sideCount == 2)
+        {
+            for (int d = 0; d < 4; d++)
+            {
+                if (sides != ((1 << d) | (1 << ((d + 1) % 4)))) continue;
+                rotation = d;
+                return wallCornerTile;
+            }
+            return wallTile;
+        }
+
+        if (sideCount == 0)
+        {
+            int corners = 0;
+            int cornerCount = 0;
+            for (int d = 0; d < 4; d++)
+            {
+                if (!DungeonGrid.IsWalkable(cell + ClockwiseDiagonals[d])) continue;
+                corners |= 1 << d;
+                cornerCount++;
+            }
+
+            if (cornerCount == 1)
+            {
+                rotation = BitIndex(corners);
+                return wallNubTile;
+            }
+        }
+
+        return wallTile;
+    }
+
+    private static int BitIndex(int singleBit)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            if ((singleBit & (1 << i)) != 0) return i;
+        }
+        return 0;
     }
 
     public Vector2Int RoomCenter(int roomIndex)
