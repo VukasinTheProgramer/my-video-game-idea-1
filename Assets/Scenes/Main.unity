@@ -3463,7 +3463,16 @@ MonoBehaviour:
   dungeonGenerator: {fileID: 2035535283}
   playerPrefab: {fileID: 3951102493593941688, guid: 1297cc5a4babc4a168135664d0485fbb, type: 3}
   enemyPrefab: {fileID: 2314456458880152076, guid: bfdc1362d54084733b902e10bc3fe57b, type: 3}
-  itemPrefab: {fileID: 676636541672477859, guid: 815b5c5b2d83746a38a8aa2a1f805077, type: 3}
+  itemPrefabs:
+  - {fileID: 4605817075153881232, guid: cf498e47fe21a49938ed66104fe55d9e, type: 3}
+  - {fileID: 4605817075153881232, guid: cf498e47fe21a49938ed66104fe55d9e, type: 3}
+  - {fileID: 4605817075153881232, guid: cf498e47fe21a49938ed66104fe55d9e, type: 3}
+  - {fileID: 4605817075153881232, guid: cf498e47fe21a49938ed66104fe55d9e, type: 3}
+  - {fileID: 1120148289727380582, guid: 138fdacdf1f05466d8bcbc7ce55256cf, type: 3}
+  - {fileID: 1120148289727380582, guid: 138fdacdf1f05466d8bcbc7ce55256cf, type: 3}
+  - {fileID: 5971877957796526182, guid: 7988aa6488b5b4d92b51dd086c5181bc, type: 3}
+  - {fileID: 3679881661076488821, guid: cd885e4ee90044977b87ba924ef8dfd2, type: 3}
+  starterPotionPrefab: {fileID: 4605817075153881232, guid: cf498e47fe21a49938ed66104fe55d9e, type: 3}
   startingWeapon: {fileID: 0}
   startingGear:
   - {fileID: 11400000, guid: 55f4a2d8b586c4e598fd61a59fd4a16d, type: 2}
@@ -5944,7 +5953,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   layout: {fileID: 11400000, guid: c94c925f0876b4a109ee198fc202fcbc, type: 2}
   floorTilemap: {fileID: 764266933}
-  floorTile: {fileID: 11400000, guid: 817f6b50443554c47abc5559debe6699, type: 2}
+  floorTiles:
+  - {fileID: 11400000, guid: 817f6b50443554c47abc5559debe6699, type: 2}
+  - {fileID: 11400000, guid: 817f6b50443554c47abc5559debe6699, type: 2}
+  - {fileID: 11400000, guid: 817f6b50443554c47abc5559debe6699, type: 2}
+  - {fileID: 11400000, guid: ee5c64248747d49f7a31042a1be0f401, type: 2}
+  - {fileID: 11400000, guid: a640ded2827964ab794c319a33bf6687, type: 2}
+  - {fileID: 11400000, guid: d44dd2f9af4a5482f91b40003f6672cf, type: 2}
   wallTile: {fileID: 11400000, guid: fb531480d5b14f0aa1fe8c9147260cf4, type: 2}
   wallEdgeTile: {fileID: 11400000, guid: ee98ae62830b410fbca401f903d70b34, type: 2}
   wallCornerTile: {fileID: 11400000, guid: ad7e67a95add4b3cade281bb567e9716, type: 2}

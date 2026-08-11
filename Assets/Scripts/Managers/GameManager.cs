@@ -18,7 +18,11 @@ public class GameManager : MonoBehaviour
     [SerializeField] private DungeonGenerator dungeonGenerator;
     [SerializeField] private PlayerController playerPrefab;
     [SerializeField] private EnemyController enemyPrefab;
-    [SerializeField] private HealthPotionPickup itemPrefab;
+    [Tooltip("Potion pickups to spawn from, picked uniformly per spawn. List a prefab more than once to bias its odds instead of adding a weight system (same idiom as DungeonGenerator.floorTiles).")]
+    [SerializeField] private HealthPotionPickup[] itemPrefabs;
+
+    [Tooltip("The one guaranteed potion placed in floor 1's second room (SpawnStarterPotion). The player starts with none, so this is their first - keep it the small one.")]
+    [SerializeField] private HealthPotionPickup starterPotionPrefab;
     [SerializeField] private EquippableItem startingWeapon;
     [Tooltip("Flavour starting gear equipped as-authored - NOT routed through ItemGenerator (unlike startingWeapon above), so each one's bonusStats/weaponType stays exactly what's on the asset instead of being rerolled from that slot's stat budget. Use for zero-stat cosmetic pieces or a deliberately fixed-damage starter weapon.")]
     [SerializeField] private EquippableItem[] startingGear;
@@ -123,6 +127,7 @@ public class GameManager : MonoBehaviour
         SpawnEnemies(rooms.Count);
         SpawnBoss(rooms.Count);
         SpawnItems(rooms.Count);
+        SpawnStarterPotion(rooms.Count);
         SpawnChests(rooms.Count);
         SpawnTutorialSign();
         SpawnFloorTestFixtures(rooms.Count);
@@ -374,9 +379,33 @@ public class GameManager : MonoBehaviour
         spawnedEnemies.Add(boss);
     }
 
+    /// <summary>
+    /// Floor 1's guaranteed first potion, in the SECOND room (index 1) - the player
+    /// starts with none, so this is where they meet the mechanic. Deliberate and
+    /// hand-placed, same spirit as SpawnTutorialSign, rather than left to
+    /// SpawnItems' per-room roll which could put the first potion anywhere or
+    /// nowhere.
+    /// </summary>
+    private void SpawnStarterPotion(int roomCount)
+    {
+        if (CurrentFloor != 1 || roomCount < 2) return;
+        if (starterPotionPrefab == null) return;
+
+        Vector2Int cell = dungeonGenerator.RoomCenter(1);
+        if (DungeonGrid.IsOccupied(cell) || DungeonGrid.HasItem(cell) || DungeonGrid.GetInteractable(cell) != null) return;
+
+        HealthPotionPickup potion = Instantiate(starterPotionPrefab);
+        potion.transform.position = GridUtils.CellToWorld(cell);
+        spawnedItems.Add(potion);
+    }
+
     private void SpawnItems(int roomCount)
     {
-        if (itemPrefab == null) return;
+        if (itemPrefabs == null || itemPrefabs.Length == 0) return;
+
+        // Floor 1's only potion is the hand-placed starter one above, so the
+        // introduction isn't drowned out by random drops in the same few rooms.
+        if (CurrentFloor == 1) return;
 
         for (int roomIndex = 0; roomIndex < roomCount; roomIndex++)
         {
@@ -385,7 +414,13 @@ public class GameManager : MonoBehaviour
             Vector2Int spawnCell = dungeonGenerator.RandomCellInRoom(roomIndex);
             if (DungeonGrid.IsOccupied(spawnCell)) continue;
 
-            HealthPotionPickup item = Instantiate(itemPrefab);
+            // Same "list it more than once to weight it" idiom as
+            // DungeonGenerator.floorTiles - the small potion is listed several
+            // times so the big/ultra ones stay rare without a weight table.
+            HealthPotionPickup prefab = itemPrefabs[UnityEngine.Random.Range(0, itemPrefabs.Length)];
+            if (prefab == null) continue;
+
+            HealthPotionPickup item = Instantiate(prefab);
             item.transform.position = GridUtils.CellToWorld(spawnCell);
             spawnedItems.Add(item);
         }

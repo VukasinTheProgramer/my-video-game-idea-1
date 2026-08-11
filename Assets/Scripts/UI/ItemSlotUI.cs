@@ -36,6 +36,13 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
     private EquippableItem boundItem;
     public EquippableItem BoundItem => boundItem;
 
+    private Text countText;
+    private ConsumableItem boundPotion;
+    /// <summary>The potion this slot shows, or null when it holds equipment (or nothing).
+    /// Kept separate from BoundItem rather than sharing one field: drag-to-equip reads
+    /// BoundItem, and a potion must never be draggable onto an equipment slot.</summary>
+    public ConsumableItem BoundPotion => boundPotion;
+
     // Drop-target config, set by EquipmentPanelUI once per Refresh via SetDropTarget:
     // null = a bag slot, accepts any dragged item (dropping an equipped item here
     // means "unequip"). Non-null = an equip slot, only accepts a dragged item whose
@@ -68,6 +75,18 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
         iconImage = iconGO.GetComponent<Image>();
         iconImage.preserveAspect = true;
         SetStretch(iconGO.GetComponent<RectTransform>(), outlineThickness);
+
+        // Stack count, bottom-right. Only potions stack, so it stays hidden for gear.
+        var countGO = new GameObject("Count", typeof(RectTransform), typeof(Text));
+        countGO.transform.SetParent(transform, false);
+        SetStretch(countGO.GetComponent<RectTransform>(), 2f);
+        countText = countGO.GetComponent<Text>();
+        countText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        countText.fontSize = 14;
+        countText.alignment = TextAnchor.LowerRight;
+        countText.color = Color.white;
+        countText.raycastTarget = false;
+        countText.text = string.Empty;
 
         button = gameObject.GetComponent<Button>();
         if (button == null) button = gameObject.AddComponent<Button>();
@@ -102,6 +121,8 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
         BuildHierarchy(); // safety if Bind is somehow called before Awake
 
         boundItem = item;
+        boundPotion = null;              // pooled slots are reused - a stale potion here
+        countText.text = string.Empty;   // would leave this square draggable as the wrong thing
 
         Sprite icon = item != null && item.walkDown != null && item.walkDown.Length > 0 ? item.walkDown[0] : null;
         iconImage.sprite = icon;
@@ -132,6 +153,31 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
         {
             outlineImage.color = RarityVisuals.OutlineColor(item.rarity);
         }
+    }
+
+    /// <summary>Shows a stack of potions in this slot. Deliberately NOT draggable -
+    /// dragging exists to equip things, and a potion has no slot to be dropped into;
+    /// it is used from its right-click tooltip instead.</summary>
+    public void BindPotion(ConsumableItem potion, int count, Action onRightClick = null)
+    {
+        BuildHierarchy();
+
+        boundItem = null;   // so drag/drop can never pick this square up as gear
+        boundPotion = potion;
+
+        iconImage.sprite = potion != null ? potion.icon : null;
+        iconImage.enabled = iconImage.sprite != null;
+
+        StopMotion();
+        this.onRightClick = onRightClick;
+        button.interactable = onRightClick != null;
+
+        countText.text = count > 1 ? count.ToString() : string.Empty;
+
+        // Potions have no rarity of their own, so the frame is a flat neutral tint
+        // rather than borrowing a rarity color that would imply a tier they don't have.
+        outlineImage.enabled = true;
+        outlineImage.color = potion != null ? new Color(0.35f, 0.35f, 0.4f, 1f) : new Color(0f, 0f, 0f, 0f);
     }
 
     public void OnPointerClick(PointerEventData eventData)

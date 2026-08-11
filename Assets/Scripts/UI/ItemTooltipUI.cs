@@ -114,6 +114,7 @@ public class ItemTooltipUI : MonoBehaviour
         statsText.text = BuildStatsText(item);
 
         actionLabel.text = actionLabelText;
+        actionButton.interactable = true; // ShowPotion can leave this disabled; equipment actions are always available
         actionButton.onClick.RemoveAllListeners();
         actionButton.onClick.AddListener(() =>
         {
@@ -133,6 +134,43 @@ public class ItemTooltipUI : MonoBehaviour
                 Hide();
             });
         }
+
+        gameObject.SetActive(true);
+        transform.SetAsLastSibling();
+    }
+
+    /// <summary>Potion variant of Show: name, what it heals, and a single action
+    /// button (normally "Use"). Separate overload rather than widening the
+    /// EquippableItem one - a potion has no slot, item level or bonusStats, so
+    /// every line of BuildStatsText would have had to be made conditional.
+    ///
+    /// actionEnabled false greys the button out (on cooldown, or already at full
+    /// health) instead of hiding it, so the action stays discoverable and the
+    /// label can say why.</summary>
+    public void ShowPotion(ConsumableItem potion, int count, string actionLabelText,
+        System.Action onAction, bool actionEnabled = true)
+    {
+        BuildHierarchy();
+        if (potion == null)
+        {
+            Hide();
+            return;
+        }
+
+        nameText.text = count > 1 ? $"{potion.displayName} x{count}" : potion.displayName;
+        nameText.color = Color.white;
+        statsText.text = $"Restores {Mathf.RoundToInt(potion.healPercent * 100f)}% of max HP";
+
+        actionLabel.text = actionLabelText;
+        actionButton.interactable = actionEnabled;
+        actionButton.onClick.RemoveAllListeners();
+        actionButton.onClick.AddListener(() =>
+        {
+            onAction?.Invoke();
+            Hide();
+        });
+
+        secondActionButton.gameObject.SetActive(false);
 
         gameObject.SetActive(true);
         transform.SetAsLastSibling();

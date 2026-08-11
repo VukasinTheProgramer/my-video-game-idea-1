@@ -38,6 +38,12 @@ public class LootChest : MonoBehaviour, IInteractable
     [SerializeField] private int goldRewardMin = 5;
     [SerializeField] private int goldRewardMax = 15;
 
+    [Tooltip("Chance this chest also contains a potion. Deliberately far higher than the per-room floor spawn (FloorScalingConfig.itemSpawnChance) - opening a chest should be the reliable way to restock, not a coin flip you already got for free by walking through the room.")]
+    [Range(0f, 1f)] [SerializeField] private float potionChance = 0.8f;
+
+    [Tooltip("Which potions this chest can contain, picked uniformly. List one more than once to weight it (same idiom as GameManager.itemPrefabs / DungeonGenerator.floorTiles); a big chest can skew this toward the stronger tiers on its own prefab.")]
+    [SerializeField] private ConsumableItem[] potionPool;
+
     [Tooltip("If true, this chest's loot always includes at least one item of guaranteedMinRarity or better (LootTable.RollAtLeastRarity), topped up after the normal roll if it didn't already produce one - a special/rare chest variant, not the default for a plain chest.")]
     [SerializeField] private bool guaranteesMinRarity = false;
     [SerializeField] private Rarity guaranteedMinRarity = Rarity.Rare;
@@ -103,20 +109,39 @@ public class LootChest : MonoBehaviour, IInteractable
                 }
             }
 
+            ConsumableItem potion = RollPotion();
+            if (potion != null)
+            {
+                PotionBag potionBag = player.GetComponent<PotionBag>();
+                // Only counts as granted if there was somewhere to put it, so the
+                // summary can't claim a potion the player never received.
+                if (potionBag != null) potionBag.Add(potion);
+                else potion = null;
+            }
+
             Wallet wallet = player.GetComponent<Wallet>();
             int gold = Random.Range(goldRewardMin, goldRewardMax + 1);
             wallet?.AddGold(gold);
 
-            MessagePopupUI.Instance.Show("Chest", BuildSummary(granted, gold), autoDismissSeconds: 5f);
+            MessagePopupUI.Instance.Show("Chest", BuildSummary(granted, potion, gold), autoDismissSeconds: 5f);
         }
 
         Destroy(gameObject);
     }
 
-    private static string BuildSummary(List<EquippableItem> granted, int gold)
+    private ConsumableItem RollPotion()
+    {
+        if (potionPool == null || potionPool.Length == 0) return null;
+        if (Random.value > potionChance) return null;
+
+        ConsumableItem picked = potionPool[Random.Range(0, potionPool.Length)];
+        return picked; // may be null if the pool has an empty slot - caller treats that as "no potion"
+    }
+
+    private static string BuildSummary(List<EquippableItem> granted, ConsumableItem potion, int gold)
     {
         var sb = new StringBuilder();
-        if (granted.Count == 0)
+        if (granted.Count == 0 && potion == null)
         {
             sb.Append("The chest held only gold.\n");
         }
@@ -127,6 +152,7 @@ public class LootChest : MonoBehaviour, IInteractable
             {
                 sb.Append("- ").Append(item.displayName).Append('\n');
             }
+            if (potion != null) sb.Append("- ").Append(potion.displayName).Append('\n');
         }
         sb.Append("+").Append(gold).Append(" gold");
         return sb.ToString();

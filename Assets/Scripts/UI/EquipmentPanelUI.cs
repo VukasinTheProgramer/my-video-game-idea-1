@@ -55,6 +55,8 @@ public class EquipmentPanelUI : MonoBehaviour
     private Inventory boundInventory;
     private PlayerProgression boundProgression;
     private Wallet boundWallet;
+    private PotionBag boundPotionBag;
+    private PotionBag subscribedPotionBag;
 
     private PlayerController subscribedPlayer;
     private Inventory subscribedInventory;
@@ -114,6 +116,7 @@ public class EquipmentPanelUI : MonoBehaviour
         boundInventory = player.GetComponent<Inventory>();
         boundProgression = player.GetComponent<PlayerProgression>();
         boundWallet = player.GetComponent<Wallet>();
+        boundPotionBag = player.GetComponent<PotionBag>();
     }
 
     private void SpendPoint(PlayerProgression.AllocatableStat stat)
@@ -165,6 +168,9 @@ public class EquipmentPanelUI : MonoBehaviour
             subscribedProgression.OnXPChanged += HandleProgressionXPChanged;
             subscribedProgression.OnStatPointsChanged += HandleProgressionPointsChanged;
         }
+
+        subscribedPotionBag = boundPotionBag;
+        if (subscribedPotionBag != null) subscribedPotionBag.OnChanged += Refresh;
     }
 
     private void Unsubscribe()
@@ -180,6 +186,7 @@ public class EquipmentPanelUI : MonoBehaviour
             subscribedProgression.OnXPChanged -= HandleProgressionXPChanged;
             subscribedProgression.OnStatPointsChanged -= HandleProgressionPointsChanged;
         }
+        if (subscribedPotionBag != null) subscribedPotionBag.OnChanged -= Refresh;
         subscribedPlayer = null;
         subscribedInventory = null;
         subscribedProgression = null;
@@ -370,7 +377,11 @@ public class EquipmentPanelUI : MonoBehaviour
 
         IReadOnlyList<EquippableItem> items = boundInventory != null ? boundInventory.Items : System.Array.Empty<EquippableItem>();
 
-        EnsureBagPoolSize(items.Count);
+        // Potions share the bag grid but are stacked by kind, so 5 small potions are
+        // one square showing "5" rather than 5 identical squares crowding out gear.
+        List<KeyValuePair<ConsumableItem, int>> potionStacks = GroupPotions();
+
+        EnsureBagPoolSize(items.Count + potionStacks.Count);
 
         for (int i = 0; i < bagSlotPool.Count; i++)
         {
@@ -383,11 +394,68 @@ public class EquipmentPanelUI : MonoBehaviour
                 // equipped item here means "unequip".
                 bagSlotPool[i].SetDropTarget(null, UnequipItem);
             }
+            else if (i < items.Count + potionStacks.Count)
+            {
+                KeyValuePair<ConsumableItem, int> stack = potionStacks[i - items.Count];
+                ConsumableItem potion = stack.Key; // capture the object, never the index
+                int count = stack.Value;
+                bagSlotPool[i].gameObject.SetActive(true);
+                bagSlotPool[i].BindPotion(potion, count, () => ShowPotionTooltip(potion, count));
+                bagSlotPool[i].SetDropTarget(null, UnequipItem);
+            }
             else
             {
                 bagSlotPool[i].gameObject.SetActive(false);
             }
         }
+    }
+
+    /// <summary>Held potions collapsed to one entry per kind, weakest first.</summary>
+    private List<KeyValuePair<ConsumableItem, int>> GroupPotions()
+    {
+        var stacks = new List<KeyValuePair<ConsumableItem, int>>();
+        if (boundPotionBag == null) return stacks;
+
+        var index = new Dictionary<ConsumableItem, int>();
+        foreach (ConsumableItem potion in boundPotionBag.Potions)
+        {
+            if (potion == null) continue;
+            if (index.TryGetValue(potion, out int at)) stacks[at] = new KeyValuePair<ConsumableItem, int>(potion, stacks[at].Value + 1);
+            else
+            {
+                index[potion] = stacks.Count;
+                stacks.Add(new KeyValuePair<ConsumableItem, int>(potion, 1));
+            }
+        }
+
+        stacks.Sort((a, b) => a.Key.tier.CompareTo(b.Key.tier));
+        return stacks;
+    }
+
+    private void ShowPotionTooltip(ConsumableItem potion, int count)
+    {
+        if (tooltip == null || potion == null) return;
+
+        int floor = GameManager.Instance != null ? GameManager.Instance.CurrentFloor : 1;
+        bool onCooldown = boundPotionBag != null && boundPotionBag.IsOnCooldown(floor);
+        bool atFullHealth = boundPlayer != null && boundPlayer.CurrentHealth >= boundPlayer.Stats.maxHp;
+
+        // The label carries the reason - a greyed "Use" with no explanation reads
+        // as a broken button.
+        string label = onCooldown
+            ? $"On cooldown ({boundPotionBag.FloorsUntilReady(floor)} floors)"
+            : atFullHealth ? "Already at full health" : "Use";
+
+        tooltip.ShowPotion(potion, count, label, () => UsePotionFromBag(potion), !onCooldown && !atFullHealth);
+    }
+
+    private void UsePotionFromBag(ConsumableItem potion)
+    {
+        if (boundPotionBag == null || boundPlayer == null) return;
+
+        int floor = GameManager.Instance != null ? GameManager.Instance.CurrentFloor : 1;
+        boundPotionBag.TryUse(potion, boundPlayer, floor);
+        Refresh();
     }
 
     /// <summary>Grows the pooled bag-slot list to at least count, reusing existing slots on later refreshes instead of recreating them.</summary>

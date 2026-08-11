@@ -105,6 +105,12 @@ MonoBehaviour:
   rarityBoostMultiplier: 1
   goldRewardMin: 5
   goldRewardMax: 15
+  potionChance: 0.8
+  potionPool:
+  - {fileID: 11400000, guid: c0d1e9a21f6cc43b19247b61fea49621, type: 2}
+  - {fileID: 11400000, guid: c0d1e9a21f6cc43b19247b61fea49621, type: 2}
+  - {fileID: 11400000, guid: c0d1e9a21f6cc43b19247b61fea49621, type: 2}
+  - {fileID: 11400000, guid: 52b3df5bd51054afd9c8c577f875be3d, type: 2}
   guaranteesMinRarity: 0
   guaranteedMinRarity: 1
   footprint: {x: 1, y: 1}

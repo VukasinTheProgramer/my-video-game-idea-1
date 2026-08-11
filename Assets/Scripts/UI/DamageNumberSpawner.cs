@@ -45,6 +45,9 @@ public class DamageNumberSpawner : MonoBehaviour
     // CombatFeedbackText (shared with BattleScreenUI); heal is the one outcome
     // that class doesn't cover, so its color stays local to this spawner.
     private static readonly Color HealColor = new Color(0.3f, 0.9f, 0.35f);
+    // Pale gold, deliberately not the heal green - "you gained an item" reads as a
+    // different event from "you regained HP".
+    private static readonly Color PickupColor = new Color(1f, 0.88f, 0.55f);
 
     private void Awake()
     {
@@ -68,6 +71,16 @@ public class DamageNumberSpawner : MonoBehaviour
     {
         if (amount <= 0) return;
         Spawn(target, "+" + amount, HealColor, big: false);
+    }
+
+    /// <summary>Floating "+1 Small Potion"-style notice above whoever collected
+    /// something. Distinct from ShowHeal on purpose: picking a potion up no longer
+    /// heals (it banks into the PotionBag), so reusing the heal number would claim
+    /// HP the player didn't get.</summary>
+    public void ShowPickup(Entity target, string label)
+    {
+        if (string.IsNullOrEmpty(label)) return;
+        Spawn(target, label, PickupColor, big: false);
     }
 
     private void Spawn(Entity target, string text, Color color, bool big)

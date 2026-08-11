@@ -9,7 +9,7 @@ using UnityEngine.Tilemaps;
 /// direction (Layer 1+ - see LAYERS.md); GenerateLinear() is the same chain
 /// idea with size/direction/count all fixed instead of random, used for
 /// Layer 0's tutorial floors (GameManager picks which one runs per floor).
-/// Tilemap painting is optional — assign floorTilemap and floorTile in the
+/// Tilemap painting is optional — assign floorTilemap and floorTiles in the
 /// inspector to see it visually; leave them empty and the grid logic still
 /// works (useful before you have art in).
 /// </summary>
@@ -24,10 +24,11 @@ public class DungeonGenerator : MonoBehaviour
 
     [Header("Rendering (optional)")]
     [SerializeField] private Tilemap floorTilemap;
-    [SerializeField] private TileBase floorTile;
+    [Tooltip("Picked per-cell (uniform random, inside Generate's seeded scope - see Generate). List a tile more than once to bias its odds instead of adding a weight system; the plain variant is intentionally listed 3x on the prefab/scene so accents (tufts/clover/pebble) stay a minority, not a wash.")]
+    [SerializeField] private TileBase[] floorTiles;
 
-    // The border lives on the wall side, not the floor: floorTile is a single
-    // plain sprite and the ring of non-walkable cells around it is painted with
+    // The border lives on the wall side, not the floor: floorTiles are plain
+    // sprites and the ring of non-walkable cells around them is painted with
     // these, each rotated per-cell at paint time. Putting the border on the floor
     // instead needed 31 pre-rotated variants and still left seams wherever a
     // combination had no matching art.
@@ -310,7 +311,7 @@ public class DungeonGenerator : MonoBehaviour
 
     private void PaintTiles()
     {
-        if (floorTilemap == null || floorTile == null) return;
+        if (floorTilemap == null || floorTiles == null || floorTiles.Length == 0) return;
 
         // One batched call instead of ~1600 individual SetTile calls per floor.
         var cells = DungeonGrid.WalkableCells;
@@ -321,7 +322,10 @@ public class DungeonGenerator : MonoBehaviour
         foreach (var cell in cells)
         {
             positions[i] = new Vector3Int(cell.x, cell.y, 0);
-            tiles[i] = floorTile;
+            // Random, not a positional hash: this runs inside Generate's seeded
+            // Random.InitState block, so variant choice is already reproducible
+            // per floor/seed the same way room layout is - no separate scheme needed.
+            tiles[i] = floorTiles[Random.Range(0, floorTiles.Length)];
             i++;
         }
 
