@@ -44,6 +44,7 @@ public class BattleScreenUI : MonoBehaviour
     private readonly Dictionary<EnemyController, BattleEnemyPanelUI> activePanels = new Dictionary<EnemyController, BattleEnemyPanelUI>();
 
     private Entity player;
+    private SpriteRenderer playerRenderer;
     private Action onAttackPressed;
     private bool inputEnabled;
 
@@ -62,6 +63,29 @@ public class BattleScreenUI : MonoBehaviour
         }
     }
 
+    /// <summary>Keeps every portrait on the current body frame while the screen is open.
+    /// Show/Bind only snapshot the sprite once, so hurt and attack animations played
+    /// well after the fight started never showed here (the doc comment above called
+    /// the snapshot a v1 simplification - this is the cheap half of undoing it, no
+    /// battle-specific art required). LateUpdate so it runs after the animator's
+    /// coroutines have set this frame's sprite.</summary>
+    private void LateUpdate()
+    {
+        if (root == null || !root.activeSelf) return;
+
+        if (playerIcon != null && playerRenderer != null
+            && !ReferenceEquals(playerIcon.sprite, playerRenderer.sprite))
+        {
+            playerIcon.sprite = playerRenderer.sprite;
+            playerIcon.enabled = playerIcon.sprite != null;
+        }
+
+        foreach (BattleEnemyPanelUI panel in activePanels.Values)
+        {
+            panel.RefreshIcon();
+        }
+    }
+
     public void Show(PlayerController player, IReadOnlyList<EnemyController> enemies, Action onAttackPressed)
     {
         this.player = player;
@@ -75,6 +99,7 @@ public class BattleScreenUI : MonoBehaviour
         // the battle screen). Clearing the selection makes Space mean only "attack".
         if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
 
+        playerRenderer = player.GetComponent<SpriteRenderer>();
         SetIcon(playerIcon, player);
         HandlePlayerHealthChanged(player, player.CurrentHealth, player.MaxHealth);
 
@@ -135,6 +160,7 @@ public class BattleScreenUI : MonoBehaviour
     {
         if (player != null) player.OnHealthChanged -= HandlePlayerHealthChanged;
         player = null;
+        playerRenderer = null;
         onAttackPressed = null;
 
         // A number still mid-float when the fight ends would otherwise freeze

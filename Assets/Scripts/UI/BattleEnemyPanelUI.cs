@@ -25,6 +25,7 @@ public class BattleEnemyPanelUI : MonoBehaviour
     private CanvasGroup canvasGroup;
 
     private EnemyController boundEnemy;
+    private SpriteRenderer boundRenderer;
 
     private void Awake()
     {
@@ -106,8 +107,8 @@ public class BattleEnemyPanelUI : MonoBehaviour
         boundEnemy = enemy;
         if (enemy == null) return;
 
-        SpriteRenderer renderer = enemy.GetComponent<SpriteRenderer>();
-        iconImage.sprite = renderer != null ? renderer.sprite : null;
+        boundRenderer = enemy.GetComponent<SpriteRenderer>();
+        iconImage.sprite = boundRenderer != null ? boundRenderer.sprite : null;
         iconImage.enabled = iconImage.sprite != null;
 
         // Instantiate() appends "(Clone)" - same trim BattleScreenUI's old single-enemy path used.
@@ -124,6 +125,22 @@ public class BattleEnemyPanelUI : MonoBehaviour
     {
         if (boundEnemy != null) boundEnemy.OnHealthChanged -= HandleHealthChanged;
         boundEnemy = null;
+        boundRenderer = null;
+    }
+
+    /// <summary>Re-reads the bound enemy's current body sprite. Bind only snapshots it
+    /// once, so the hurt/attack frames DirectionalSpriteAnimator drives on the world
+    /// SpriteRenderer never reached this portrait - it sat frozen for the whole fight.
+    /// Driven by BattleScreenUI's LateUpdate rather than a per-frame event, since the
+    /// animator has no per-frame callback and polling one cached reference is cheaper
+    /// than adding one.</summary>
+    public void RefreshIcon()
+    {
+        if (boundRenderer == null || iconImage == null) return;
+        if (ReferenceEquals(iconImage.sprite, boundRenderer.sprite)) return;
+
+        iconImage.sprite = boundRenderer.sprite;
+        iconImage.enabled = iconImage.sprite != null;
     }
 
     /// <summary>Dims the panel when its enemy dies - stays visible (not hidden) so the

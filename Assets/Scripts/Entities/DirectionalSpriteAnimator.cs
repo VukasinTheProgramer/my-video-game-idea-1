@@ -27,6 +27,10 @@ public class DirectionalSpriteAnimator : MonoBehaviour
     private Equipment equipment;
     private Sprite[] currentWalkSet;
     private Coroutine actionRoutine;
+    // Which action actionRoutine is running. Walk is the only one a new walk may
+    // cut short: stepping tile after tile must restart the stride each time, while
+    // an attack or hurt owns the body until it finishes.
+    private AnimAction currentAction;
 
     private void Awake()
     {
@@ -61,6 +65,25 @@ public class DirectionalSpriteAnimator : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Runs the walk cycle once across <paramref name="durationSeconds"/>, so the
+    /// stride finishes exactly as Entity's tile-to-tile slide does. Without this
+    /// the body only ever showed walk frame 0 and appeared to glide between cells -
+    /// the frames were wired on the prefab all along, nothing was cycling them.
+    ///
+    /// An in-flight attack or hurt wins; only another walk may restart it, so
+    /// following a multi-tile path re-triggers the stride per step instead of
+    /// being swallowed by the previous step's routine.
+    /// </summary>
+    public void PlayWalk(float durationSeconds)
+    {
+        if (actionRoutine != null && currentAction != AnimAction.Walk) return;
+        if (currentWalkSet == null || currentWalkSet.Length == 0) return;
+
+        PlayAction(currentWalkSet, currentWalkSet.Length,
+            durationSeconds / currentWalkSet.Length, AnimAction.Walk);
+    }
+
     public void PlayAttack()
     {
         Sprite[] frames = PickSet(FacingToDirection(), attackDown, attackLeft, attackRight, attackUp);
@@ -80,6 +103,7 @@ public class DirectionalSpriteAnimator : MonoBehaviour
     private void PlayAction(Sprite[] frames, int frameCount, float frameSeconds, AnimAction action)
     {
         if (actionRoutine != null) StopCoroutine(actionRoutine);
+        currentAction = action;
         actionRoutine = StartCoroutine(RunAction(frames, frameCount, frameSeconds, action));
     }
 

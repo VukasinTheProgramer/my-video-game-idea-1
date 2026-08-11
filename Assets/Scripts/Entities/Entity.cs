@@ -133,7 +133,8 @@ public class Entity : MonoBehaviour
     {
         if (!DungeonGrid.CanMoveTo(newCell)) return;
 
-        Face(newCell - Cell);
+        Face(newCell - Cell); // sets the animator's direction, so walk must follow it
+        if (directionalAnimator != null) directionalAnimator.PlayWalk(moveAnimSeconds);
 
         DungeonGrid.ClearOccupant(Cell);
         Cell = newCell;

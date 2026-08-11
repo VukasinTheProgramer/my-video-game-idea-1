@@ -117,7 +117,7 @@ MonoBehaviour:
     dodgeBonus: 0
     parryBonus: 0
     lifeSteal: 0
-  moveAnimSeconds: 0.12
+  moveAnimSeconds: 0.2
   hitFlashColor: {r: 1, g: 0.35, b: 0.35, a: 1}
   hitFlashSeconds: 0.08
 --- !u!114 &1858029300184706853

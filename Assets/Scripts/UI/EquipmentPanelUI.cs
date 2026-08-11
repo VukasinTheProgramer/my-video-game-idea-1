@@ -42,7 +42,7 @@ public class EquipmentPanelUI : MonoBehaviour
 
     [Header("Bag - ItemSlotUI squares are spawned/pooled here at runtime")]
     [SerializeField] private RectTransform bagSlotContainer;
-    [SerializeField] private Vector2 bagSlotSize = new Vector2(48f, 48f);
+    [SerializeField] private Vector2 bagSlotSize = new Vector2(64f, 64f);
 
     private readonly List<ItemSlotUI> bagSlotPool = new List<ItemSlotUI>();
 
