@@ -382,39 +382,37 @@ public class DungeonGenerator : MonoBehaviour
             sideCount++;
         }
 
-        if (sideCount == 1)
+        switch (sideCount)
         {
-            rotation = BitIndex(sides);
-            return wallEdgeTile;
-        }
+            case 1:
+                rotation = BitIndex(sides);
+                return wallEdgeTile;
 
-        if (sideCount == 2)
-        {
-            for (int d = 0; d < 4; d++)
-            {
-                if (sides != ((1 << d) | (1 << ((d + 1) % 4)))) continue;
-                rotation = d;
-                return wallCornerTile;
-            }
-            return wallTile;
-        }
+            case 2:
+                for (int d = 0; d < 4; d++)
+                {
+                    if (sides != ((1 << d) | (1 << ((d + 1) % 4)))) continue;
+                    rotation = d;
+                    return wallCornerTile;
+                }
+                return wallTile;
 
-        if (sideCount == 0)
-        {
-            int corners = 0;
-            int cornerCount = 0;
-            for (int d = 0; d < 4; d++)
-            {
-                if (!DungeonGrid.IsWalkable(cell + ClockwiseDiagonals[d])) continue;
-                corners |= 1 << d;
-                cornerCount++;
-            }
+            case 0:
+                int corners = 0;
+                int cornerCount = 0;
+                for (int d = 0; d < 4; d++)
+                {
+                    if (!DungeonGrid.IsWalkable(cell + ClockwiseDiagonals[d])) continue;
+                    corners |= 1 << d;
+                    cornerCount++;
+                }
 
-            if (cornerCount == 1)
-            {
-                rotation = BitIndex(corners);
-                return wallNubTile;
-            }
+                if (cornerCount == 1)
+                {
+                    rotation = BitIndex(corners);
+                    return wallNubTile;
+                }
+                break;
         }
 
         return wallTile;

@@ -479,28 +479,28 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void SpawnFloorTestFixtures(int roomCount)
     {
-        if (CurrentFloor == 2)
+        switch (CurrentFloor)
         {
-            SpawnFixture(roomCount,
-                "Chests hold gold and gear. Walk up to one and press E to open it. " +
-                "Large chests (two tiles wide) have better odds and rarer loot than small ones.",
-                smallChestPrefab != null ? smallChestPrefab : largeChestPrefab);
-        }
-        else if (CurrentFloor == 3)
-        {
-            SpawnFixture(roomCount,
-                "This chest is special - it always contains at least one Rare item or " +
-                "better, has better odds for everything else too, and holds far more " +
-                "gold than an ordinary chest.",
-                specialChestPrefab);
-        }
-        else if (CurrentFloor == 4)
-        {
-            SpawnFixture(roomCount,
-                "Press B to open your bag, or C for your character menu - both show " +
-                "your inventory and equipped gear together. To equip an item, drag it " +
-                "from the bag onto its matching slot, or right-click it and press Equip.",
-                null);
+            case 2:
+                SpawnFixture(roomCount,
+                    "Chests hold gold and gear. Walk up to one and press E to open it. " +
+                    "Large chests (two tiles wide) have better odds and rarer loot than small ones.",
+                    smallChestPrefab != null ? smallChestPrefab : largeChestPrefab);
+                break;
+            case 3:
+                SpawnFixture(roomCount,
+                    "This chest is special - it always contains at least one Rare item or " +
+                    "better, has better odds for everything else too, and holds far more " +
+                    "gold than an ordinary chest.",
+                    specialChestPrefab);
+                break;
+            case 4:
+                SpawnFixture(roomCount,
+                    "Press B to open your bag, or C for your character menu - both show " +
+                    "your inventory and equipped gear together. To equip an item, drag it " +
+                    "from the bag onto its matching slot, or right-click it and press Equip.",
+                    null);
+                break;
         }
     }
 
