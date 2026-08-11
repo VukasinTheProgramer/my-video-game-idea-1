@@ -77,6 +77,11 @@ public class PotionQuickUseUI : MonoBehaviour
 
         BuildHierarchy(canvas);
 
+        // Hidden until a run actually starts (GameManager.OnPlayerSpawned) - the
+        // button self-bootstraps on scene load, which is also the main-menu
+        // screen, and there's no bag/player to use yet at that point.
+        gameObject.SetActive(false);
+
         if (GameManager.Instance != null)
         {
             GameManager.Instance.OnPlayerSpawned += HandlePlayerSpawned;
@@ -104,6 +109,7 @@ public class PotionQuickUseUI : MonoBehaviour
         if (player == null) return;
         if (bag != null) bag.OnChanged -= Refresh;
 
+        gameObject.SetActive(true);
         playerEntity = player;
         bag = player.GetComponent<PotionBag>();
         if (bag != null) bag.OnChanged += Refresh;
