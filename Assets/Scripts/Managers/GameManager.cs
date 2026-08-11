@@ -20,6 +20,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private EnemyController enemyPrefab;
     [SerializeField] private HealthPotionPickup itemPrefab;
     [SerializeField] private EquippableItem startingWeapon;
+    [Tooltip("Flavour starting gear equipped as-authored - NOT routed through ItemGenerator (unlike startingWeapon above), so each one's bonusStats/weaponType stays exactly what's on the asset instead of being rerolled from that slot's stat budget. Use for zero-stat cosmetic pieces or a deliberately fixed-damage starter weapon.")]
+    [SerializeField] private EquippableItem[] startingGear;
     [SerializeField] private SignPost signPrefab;
     [Tooltip("Two chest sizes, same LootChest script, different footprint data (see LootChest.Footprint). ChooseChestPrefab rolls which one spawns.")]
     [FormerlySerializedAs("chestPrefab")]
@@ -189,6 +191,28 @@ public class GameManager : MonoBehaviour
                 else
                 {
                     Debug.LogWarning("GameManager: player prefab has no Equipment component; startingWeapon ignored.");
+                }
+            }
+
+            if (startingGear != null && startingGear.Length > 0)
+            {
+                if (player.TryGetComponent(out Equipment gearEquipment))
+                {
+                    foreach (EquippableItem template in startingGear)
+                    {
+                        if (template == null) continue;
+                        // Instantiate, not ItemGenerator.Generate: these are flavour
+                        // pieces (a plain shirt, a 1-attack starter weapon) meant to
+                        // keep their authored stats exactly, not get rerolled from
+                        // the slot's stat budget like a real drop would.
+                        EquippableItem gear = Instantiate(template);
+                        gearEquipment.Equip(gear.slot, gear);
+                    }
+                    player.RefillHealth();
+                }
+                else
+                {
+                    Debug.LogWarning("GameManager: player prefab has no Equipment component; startingGear ignored.");
                 }
             }
             OnPlayerSpawned?.Invoke(player);
