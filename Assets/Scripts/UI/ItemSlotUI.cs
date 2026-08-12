@@ -28,6 +28,18 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
     [SerializeField] private float outlineThickness = 4f;
     [SerializeField] private float motionPulseSeconds = 0.6f;
 
+    // "Adventurer Loadout" mockup palette (2026-08-12 equipment panel reskin) -
+    // border-soft/panel-inset tones so empty squares and potion stacks read as
+    // part of the same dark warm UI family as EquipmentPanelUI's chrome.
+    private static readonly Color EmptySlotColor = HexColor("#2E2118");
+    private static readonly Color PotionSlotColor = HexColor("#3A2A1E");
+
+    private static Color HexColor(string hex)
+    {
+        ColorUtility.TryParseHtmlString(hex, out Color c);
+        return c;
+    }
+
     private Image outlineImage;
     private Image iconImage;
     private Button button;
@@ -81,7 +93,7 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
         countGO.transform.SetParent(transform, false);
         SetStretch(countGO.GetComponent<RectTransform>(), 2f);
         countText = countGO.GetComponent<Text>();
-        countText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        countText.font = UIFonts.Default;
         countText.fontSize = 14;
         countText.alignment = TextAnchor.LowerRight;
         countText.color = Color.white;
@@ -134,11 +146,13 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
 
         if (item == null)
         {
-            // Stays enabled (raycastable) but invisible, rather than disabled outright -
-            // a disabled Graphic doesn't raycast at all, and an empty EQUIP slot must
-            // still be a valid drop target (that's the main point of dropping an item:
-            // filling an empty slot). Zero visible difference from fully disabled.
-            outlineImage.color = new Color(0f, 0f, 0f, 0f);
+            // Stays enabled (raycastable), now with a visible dark-inset + faint border
+            // look (2026-08-12 reskin) instead of fully transparent - the mockup's empty
+            // squares are still visible grid cells, not blank space, so a closed panel's
+            // shape reads at a glance. Raycasting is unaffected either way (Unity doesn't
+            // alpha-test hit tests by default), so this is a pure visual change - an empty
+            // EQUIP slot is still a valid drop target for filling it.
+            outlineImage.color = EmptySlotColor;
             outlineImage.enabled = true;
             return;
         }
@@ -177,7 +191,7 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IBeginDragHandler
         // Potions have no rarity of their own, so the frame is a flat neutral tint
         // rather than borrowing a rarity color that would imply a tier they don't have.
         outlineImage.enabled = true;
-        outlineImage.color = potion != null ? new Color(0.35f, 0.35f, 0.4f, 1f) : new Color(0f, 0f, 0f, 0f);
+        outlineImage.color = potion != null ? PotionSlotColor : EmptySlotColor;
     }
 
     public void OnPointerClick(PointerEventData eventData)

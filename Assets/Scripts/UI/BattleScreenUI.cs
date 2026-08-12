@@ -257,7 +257,7 @@ public class BattleScreenUI : MonoBehaviour
         rect.sizeDelta = new Vector2(140f, 40f);
 
         Text label = go.GetComponent<Text>();
-        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        label.font = UIFonts.Default;
         label.alignment = TextAnchor.MiddleCenter;
         label.text = text;
         label.color = color;

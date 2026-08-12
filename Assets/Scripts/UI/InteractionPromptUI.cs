@@ -47,7 +47,7 @@ public class InteractionPromptUI : MonoBehaviour
         rt.sizeDelta = new Vector2(300f, 40f);
 
         label = go.GetComponent<Text>();
-        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        label.font = UIFonts.Default;
         label.fontSize = 22;
         label.fontStyle = FontStyle.Bold;
         label.alignment = TextAnchor.MiddleCenter;

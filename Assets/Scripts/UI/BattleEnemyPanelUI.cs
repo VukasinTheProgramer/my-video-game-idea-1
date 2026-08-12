@@ -48,7 +48,7 @@ public class BattleEnemyPanelUI : MonoBehaviour
         var nameGO = new GameObject("Name", typeof(RectTransform), typeof(Text));
         nameGO.transform.SetParent(transform, false);
         nameText = nameGO.GetComponent<Text>();
-        nameText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        nameText.font = UIFonts.Default;
         nameText.alignment = TextAnchor.MiddleCenter;
         nameText.fontSize = 14;
         nameText.color = Color.white;

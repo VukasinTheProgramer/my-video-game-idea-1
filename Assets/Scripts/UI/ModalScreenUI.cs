@@ -69,7 +69,7 @@ internal static class ModalScreenUI
         labelRt.offsetMin = Vector2.zero;
         labelRt.offsetMax = Vector2.zero;
         Text label = labelGO.GetComponent<Text>();
-        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        label.font = UIFonts.Default;
         label.fontSize = 16;
         label.alignment = TextAnchor.MiddleCenter;
         label.color = Color.white;
@@ -83,7 +83,7 @@ internal static class ModalScreenUI
         var go = new GameObject(name, typeof(RectTransform), typeof(Text), typeof(LayoutElement));
         go.transform.SetParent(parent, false);
         Text text = go.GetComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = UIFonts.Default;
         text.fontSize = fontSize;
         text.fontStyle = style;
         text.alignment = alignment;

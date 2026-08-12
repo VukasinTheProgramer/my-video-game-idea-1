@@ -196,7 +196,7 @@ public class PotionQuickUseUI : MonoBehaviour
         rect.offsetMax = new Vector2(-2f, -2f);
 
         var text = go.GetComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = UIFonts.Default;
         text.fontSize = fontSize;
         text.alignment = anchor;
         text.color = Color.white;

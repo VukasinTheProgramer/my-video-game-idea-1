@@ -75,7 +75,7 @@ public class MainMenuUI : MonoBehaviour
         titleRt.sizeDelta = new Vector2(900f, 140f);
 
         Text title = titleGO.GetComponent<Text>();
-        title.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        title.font = UIFonts.Default;
         title.fontSize = 72;
         title.fontStyle = FontStyle.Bold;
         title.alignment = TextAnchor.MiddleCenter;
@@ -122,7 +122,7 @@ public class MainMenuUI : MonoBehaviour
         labelRt.offsetMax = Vector2.zero;
 
         Text text = labelGO.GetComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = UIFonts.Default;
         text.fontSize = 22;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.white;
