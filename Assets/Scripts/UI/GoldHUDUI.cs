@@ -1,16 +1,31 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Shows "Gold: N", bound to the player's Wallet.OnGoldChanged.</summary>
+/// <summary>Shows the gold icon + count, bound to the player's Wallet.OnGoldChanged.</summary>
 [RequireComponent(typeof(Text))]
 public class GoldHUDUI : MonoBehaviour
 {
+    private const string IconResourcePath = "Icons/Gold";
+    private const float IconSize = 24f;
+    private const float IconGap = 4f;
+
     private Text label;
     private Wallet wallet;
+    private GameObject icon;
 
     private void Awake()
     {
         label = GetComponent<Text>();
+        icon = HudIcon.AddBeside(GetComponent<RectTransform>(), IconResourcePath, IconSize, IconGap);
+    }
+
+    /// <summary>Hides/shows this label and its icon together - the icon is a runtime-spawned
+    /// sibling (HudIcon.AddBeside), not a child, so SetActive on this GameObject alone
+    /// wouldn't hide it (BattleScreenUI hides HUD elements while its full-screen overlay is up).</summary>
+    public void SetVisible(bool visible)
+    {
+        gameObject.SetActive(visible);
+        if (icon != null) icon.SetActive(visible);
     }
 
     private void Start()
@@ -48,6 +63,6 @@ public class GoldHUDUI : MonoBehaviour
 
     private void HandleGoldChanged(int gold)
     {
-        label.text = $"Gold: {gold}";
+        label.text = gold.ToString();
     }
 }

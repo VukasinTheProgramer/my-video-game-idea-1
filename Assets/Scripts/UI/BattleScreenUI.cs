@@ -34,6 +34,10 @@ public class BattleScreenUI : MonoBehaviour
     [SerializeField] private Text turnIndicatorText;
     [SerializeField] private Button attackButton;
 
+    [Tooltip("HUD elements hidden while the battle screen covers the dungeon view, restored on Hide.")]
+    [SerializeField] private GoldHUDUI goldHud;
+    [SerializeField] private FloorIndicatorUI floorHud;
+
     [Header("Combat feedback (IMPLEMENTED.md -> \"Combat feedback\") - UI-space so it renders on top of this full-screen overlay; DamageNumberSpawner's world-space text is hidden behind it")]
     [SerializeField] private float feedbackFloatDistance = 40f;
     [SerializeField] private float feedbackLifetimeSeconds = 0.7f;
@@ -107,6 +111,7 @@ public class BattleScreenUI : MonoBehaviour
 
         SetInputEnabled(true);
         if (root != null) root.SetActive(true);
+        SetHudElementsVisible(false);
     }
 
     private void BindEnemyPanels(IReadOnlyList<EnemyController> enemies)
@@ -179,12 +184,19 @@ public class BattleScreenUI : MonoBehaviour
 
         SetInputEnabled(false);
         if (root != null) root.SetActive(false);
+        SetHudElementsVisible(true);
     }
 
     public void SetInputEnabled(bool enabled)
     {
         inputEnabled = enabled;
         if (attackButton != null) attackButton.interactable = enabled;
+    }
+
+    private void SetHudElementsVisible(bool visible)
+    {
+        goldHud?.SetVisible(visible);
+        floorHud?.SetVisible(visible);
     }
 
     /// <summary>Updates the top-of-screen "whose turn" label. Initiative is decided by

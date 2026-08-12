@@ -43,6 +43,11 @@ public class EquipmentPanelUI : MonoBehaviour
     [Header("Bag - ItemSlotUI squares are spawned/pooled here at runtime")]
     [SerializeField] private RectTransform bagSlotContainer;
     [SerializeField] private Vector2 bagSlotSize = new Vector2(64f, 64f);
+    [SerializeField] private Text goldText;
+
+    private const string GoldIconResourcePath = "Icons/Gold";
+    private const float GoldIconSize = 24f;
+    private const float GoldIconGap = 4f;
 
     private readonly List<ItemSlotUI> bagSlotPool = new List<ItemSlotUI>();
 
@@ -61,6 +66,7 @@ public class EquipmentPanelUI : MonoBehaviour
     private PlayerController subscribedPlayer;
     private Inventory subscribedInventory;
     private PlayerProgression subscribedProgression;
+    private Wallet subscribedWallet;
 
     private static readonly EquipmentSlot[] SlotOrder =
     {
@@ -82,6 +88,8 @@ public class EquipmentPanelUI : MonoBehaviour
         // to drop onto at all, since bagSlotContainer itself starts with no
         // raycastable graphic (just a layout group).
         BagDropZone.Attach(bagSlotContainer, UnequipItem);
+
+        if (goldText != null) HudIcon.AddBeside(goldText.GetComponent<RectTransform>(), GoldIconResourcePath, GoldIconSize, GoldIconGap);
     }
 
     /// <summary>B ("Bag") and C ("Character") both open this same combined panel -
@@ -171,6 +179,9 @@ public class EquipmentPanelUI : MonoBehaviour
 
         subscribedPotionBag = boundPotionBag;
         if (subscribedPotionBag != null) subscribedPotionBag.OnChanged += Refresh;
+
+        subscribedWallet = boundWallet;
+        if (subscribedWallet != null) subscribedWallet.OnGoldChanged += HandleGoldChanged;
     }
 
     private void Unsubscribe()
@@ -187,9 +198,11 @@ public class EquipmentPanelUI : MonoBehaviour
             subscribedProgression.OnStatPointsChanged -= HandleProgressionPointsChanged;
         }
         if (subscribedPotionBag != null) subscribedPotionBag.OnChanged -= Refresh;
+        if (subscribedWallet != null) subscribedWallet.OnGoldChanged -= HandleGoldChanged;
         subscribedPlayer = null;
         subscribedInventory = null;
         subscribedProgression = null;
+        subscribedWallet = null;
     }
 
     private void OnDestroy()
@@ -201,6 +214,7 @@ public class EquipmentPanelUI : MonoBehaviour
     private void HandleBagChanged(EquippableItem item) => Refresh();
     private void HandleProgressionXPChanged(int currentXP, int xpToNextLevel) => Refresh();
     private void HandleProgressionPointsChanged(int availablePoints) => Refresh();
+    private void HandleGoldChanged(int gold) { if (goldText != null) goldText.text = gold.ToString(); }
 
     /// <summary>
     /// Equips a specific bag item into its own slot. Whatever was previously in
@@ -299,6 +313,7 @@ public class EquipmentPanelUI : MonoBehaviour
 
         RefreshStats();
         RefreshProgression();
+        if (goldText != null && boundWallet != null) goldText.text = boundWallet.Gold.ToString();
 
         for (int i = 0; i < SlotOrder.Length; i++)
         {
